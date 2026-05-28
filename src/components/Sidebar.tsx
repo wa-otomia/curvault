@@ -6,7 +6,8 @@ export type View =
   | "pkcs15"
   | "profiles"
   | "fido2"
-  | "issuance";
+  | "issuance"
+  | "sticker";
 
 const NAV: { id: View; label: string }[] = [
   { id: "dashboard", label: "Dashboard" },
@@ -17,6 +18,7 @@ const NAV: { id: View; label: string }[] = [
   { id: "profiles",  label: "Profiles" },
   { id: "fido2",     label: "FIDO2" },
   { id: "issuance",  label: "Issuance" },
+  { id: "sticker",   label: "Card Sticker" },
 ];
 
 export default function Sidebar({

@@ -9,6 +9,7 @@ import Pkcs15View from "./views/Pkcs15View";
 import ProfilesView from "./views/ProfilesView";
 import Fido2View from "./views/Fido2View";
 import IssuanceView from "./views/IssuanceView";
+import StickerView from "./views/StickerView";
 
 export default function App() {
   const [view, setView] = useState<View>("dashboard");
@@ -26,6 +27,7 @@ export default function App() {
           {view === "profiles" && <ProfilesView />}
           {view === "fido2" && <Fido2View />}
           {view === "issuance" && <IssuanceView />}
+          {view === "sticker" && <StickerView />}
         </div>
         <StatusBar />
       </div>

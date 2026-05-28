@@ -24,6 +24,7 @@ Secrets never leave the OS keychain.
 | Profiles | CRUD profiles (PKCS#15 spec, key plan, CA config) |
 | FIDO2 | List devices / credentials, set PIN, delete creds, factory reset |
 | Issuance | End-to-end flow with timeline + per-step audit |
+| Card Sticker | Generate Curvault-branded PNG stickers with QR-encoded serial |
 
 ## Prerequisites
 
