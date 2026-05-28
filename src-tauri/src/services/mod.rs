@@ -208,5 +208,10 @@ pub async fn exec_tool(tool: &str, args: &[&str]) -> std::io::Result<std::proces
     }
 
     let (shell, script) = build_shell_script(tool, args);
-    Command::new(&shell).arg("-c").arg(&script).output().await
+    // `-i` is critical: many users guard their alias / function /
+    // PATH-additions in .zshrc behind `[[ -o interactive ]]` (or it is
+    // a conditional plugin load such as oh-my-zsh). Without `-i` those
+    // blocks are skipped and `command not found` slips past even after
+    // we sourced .zshrc by hand. `-l` covers .zprofile.
+    Command::new(&shell).arg("-lic").arg(&script).output().await
 }

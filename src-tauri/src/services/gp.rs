@@ -3,6 +3,22 @@
 use super::{emit_command_log, exec_tool, Result, ServiceError};
 use serde::{Deserialize, Serialize};
 
+/// Trim a PC/SC reader name down to a contiguous run of safe characters
+/// (letters and digits) so it can survive shells, aliases backed by eval,
+/// and gp's own regex matcher. The shortened token is still distinctive
+/// in practice because reader names start with the vendor brand.
+fn safe_reader_key(reader: &str) -> String {
+    let mut out = String::new();
+    for c in reader.chars() {
+        if c.is_ascii_alphanumeric() {
+            out.push(c);
+        } else if !out.is_empty() {
+            break;
+        }
+    }
+    if out.is_empty() { reader.to_string() } else { out }
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Cplc {
@@ -41,8 +57,16 @@ pub struct CommandResult {
 async fn run_gp(reader: Option<&str>, key_hex: Option<&str>, args: &[&str]) -> Result<CommandResult> {
     let started_at = chrono::Utc::now();
 
+    // gp's -r option matches reader names against a regex. Names from
+    // opensc-tool / PC/SC often contain spaces, slashes, parentheses,
+    // and dots — passing them through a shell that re-parses (some gp
+    // installs are zsh aliases backed by `eval`) corrupts the value.
+    // We shrink the name to a unique-enough prefix containing only
+    // safe characters; gp's regex match keeps the right reader.
+    let reader_key = reader.map(safe_reader_key);
+
     let mut full_args: Vec<&str> = Vec::new();
-    if let Some(r) = reader { full_args.push("-r"); full_args.push(r); }
+    if let Some(ref r) = reader_key { full_args.push("-r"); full_args.push(r); }
     if let Some(k) = key_hex { full_args.push("-k"); full_args.push(k); }
     full_args.extend_from_slice(args);
 
