@@ -3,9 +3,24 @@
 //! Operations require a connected authenticator (USB or NFC reader holding
 //! a CTAP2 card). Listing credentials needs the PIN.
 
-use super::{Result, ServiceError};
+use super::{emit_command_log, Result, ServiceError};
 use serde::{Deserialize, Serialize};
 use tokio::process::Command;
+
+fn map_fido_error(stderr: &str) -> Option<String> {
+    if stderr.contains("FIDO_ERR_INTERNAL") {
+        return Some(
+            "Cannot open this device as a FIDO2 authenticator. \
+             libfido2 on macOS does not bridge PC/SC readers (such as PaSoRi) \
+             to CTAP2 — connect a native USB / NFC FIDO2 token directly."
+                .into(),
+        );
+    }
+    if stderr.contains("FIDO_ERR_NO_CREDENTIALS") {
+        return Some("No resident credentials on this device.".into());
+    }
+    None
+}
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -54,15 +69,28 @@ pub struct SetPinRequest {
 
 /// `fido2-token -L` -> list devices.
 pub async fn list_devices() -> Result<Vec<Fido2Device>> {
-    let out = Command::new("fido2-token")
-        .arg("-L")
-        .output()
-        .await
-        .map_err(|e| if e.kind() == std::io::ErrorKind::NotFound {
-            ServiceError::NotFound("fido2-token".into())
-        } else {
-            ServiceError::Io(e)
-        })?;
+    let started_at = chrono::Utc::now();
+    let args = ["-L"];
+    let res = Command::new("fido2-token").args(args).output().await;
+
+    match &res {
+        Ok(out) => emit_command_log(
+            "fido2-token", &args, started_at,
+            out.status.code().unwrap_or(-1),
+            &String::from_utf8_lossy(&out.stdout),
+            &String::from_utf8_lossy(&out.stderr),
+            None,
+        ),
+        Err(e) => emit_command_log(
+            "fido2-token", &args, started_at, -1, "", "", Some(&e.to_string()),
+        ),
+    }
+
+    let out = res.map_err(|e| if e.kind() == std::io::ErrorKind::NotFound {
+        ServiceError::NotFound("fido2-token".into())
+    } else {
+        ServiceError::Io(e)
+    })?;
     if !out.status.success() {
         return Err(ServiceError::Command(
             "fido2-token -L".into(),
@@ -111,15 +139,31 @@ fn parse_device_list(text: &str) -> Vec<Fido2Device> {
 
 /// `fido2-token -I <device>` -> info.
 pub async fn info(path: &str) -> Result<Fido2Info> {
-    let out = Command::new("fido2-token")
-        .args(["-I", path])
-        .output()
-        .await?;
+    let started_at = chrono::Utc::now();
+    let args = ["-I", path];
+    let res = Command::new("fido2-token").args(args).output().await;
+
+    match &res {
+        Ok(out) => emit_command_log(
+            "fido2-token", &args, started_at,
+            out.status.code().unwrap_or(-1),
+            &String::from_utf8_lossy(&out.stdout),
+            &String::from_utf8_lossy(&out.stderr),
+            None,
+        ),
+        Err(e) => emit_command_log(
+            "fido2-token", &args, started_at, -1, "", "", Some(&e.to_string()),
+        ),
+    }
+
+    let out = res?;
     if !out.status.success() {
+        let stderr = String::from_utf8_lossy(&out.stderr).into_owned();
+        let msg = map_fido_error(&stderr).unwrap_or_else(|| stderr.clone());
         return Err(ServiceError::Command(
             "fido2-token -I".into(),
             out.status.code().unwrap_or(-1),
-            String::from_utf8_lossy(&out.stderr).into_owned(),
+            msg,
         ));
     }
     let text = String::from_utf8_lossy(&out.stdout);

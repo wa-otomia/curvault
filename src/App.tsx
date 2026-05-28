@@ -1,6 +1,7 @@
 import { useState } from "react";
 import Sidebar, { type View } from "./components/Sidebar";
 import StatusBar from "./components/StatusBar";
+import LogPanel from "./components/LogPanel";
 import Dashboard from "./views/Dashboard";
 import ReadersView from "./views/ReadersView";
 import GpKeysView from "./views/GpKeysView";
@@ -29,6 +30,7 @@ export default function App() {
           {view === "issuance" && <IssuanceView />}
           {view === "sticker" && <StickerView />}
         </div>
+        <LogPanel />
         <StatusBar />
       </div>
     </>

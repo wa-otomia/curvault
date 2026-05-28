@@ -58,13 +58,18 @@ const CAP_ICON: Record<string, string> = {
 const CAPS = ["PKI", "FIDO2", "ECC", "RSA"] as const;
 
 function svgImg(svg: string): Promise<HTMLImageElement> {
+  // Use a data: URL rather than a blob: URL — Tauri's default CSP allows
+  // `img-src 'self' data:` but not `blob:`, so blob URLs silently fail
+  // to load and the capability chip icons go missing.
   return new Promise((resolve, reject) => {
-    const blob = new Blob([svg], { type: "image/svg+xml;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
     const im = new Image();
-    im.onload = () => { URL.revokeObjectURL(url); resolve(im); };
-    im.onerror = (e) => { URL.revokeObjectURL(url); reject(e); };
-    im.src = url;
+    im.onload = () => resolve(im);
+    im.onerror = (e) => reject(e);
+    // btoa needs ASCII; SVG attribute names + paths are ASCII-safe, but
+    // we round-trip through encodeURIComponent / unescape just in case
+    // any text content contains non-Latin characters in the future.
+    const encoded = btoa(unescape(encodeURIComponent(svg)));
+    im.src = `data:image/svg+xml;base64,${encoded}`;
   });
 }
 

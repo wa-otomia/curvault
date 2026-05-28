@@ -1,10 +1,6 @@
 //! Wrapper around the `gp` (GlobalPlatformPro) CLI.
-//!
-//! GP key material is never passed via the command line in cleartext when
-//! we can avoid it; for `gp --lock` and `gp -k` we still must, but we read
-//! it from the OS keychain at the last moment and don't log it.
 
-use super::{Result, ServiceError};
+use super::{emit_command_log, Result, ServiceError};
 use serde::{Deserialize, Serialize};
 use tokio::process::Command;
 
@@ -25,7 +21,7 @@ pub struct Applet {
     pub state: String,
     pub parent: Option<String>,
     pub privileges: Option<Vec<String>>,
-    pub kind: String, // "ISD" | "APP" | "PKG"
+    pub kind: String,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -43,25 +39,45 @@ pub struct CommandResult {
     pub exit_code: i32,
 }
 
-/// Run `gp` with the given args, optionally pinned to a reader and key.
 async fn run_gp(reader: Option<&str>, key_hex: Option<&str>, args: &[&str]) -> Result<CommandResult> {
-    let mut cmd = Command::new("gp");
-    if let Some(r) = reader {
-        cmd.arg("-r").arg(r);
-    }
-    if let Some(k) = key_hex {
-        cmd.arg("-k").arg(k);
-    }
-    cmd.args(args);
+    let started_at = chrono::Utc::now();
 
-    let out = cmd
-        .output()
-        .await
-        .map_err(|e| if e.kind() == std::io::ErrorKind::NotFound {
-            ServiceError::NotFound("gp".into())
-        } else {
-            ServiceError::Io(e)
-        })?;
+    let mut full_args: Vec<&str> = Vec::new();
+    if let Some(r) = reader { full_args.push("-r"); full_args.push(r); }
+    if let Some(k) = key_hex { full_args.push("-k"); full_args.push(k); }
+    full_args.extend_from_slice(args);
+
+    let mut cmd = Command::new("gp");
+    cmd.args(&full_args);
+
+    let result = cmd.output().await;
+
+    match &result {
+        Ok(out) => emit_command_log(
+            "gp",
+            &full_args,
+            started_at,
+            out.status.code().unwrap_or(-1),
+            &String::from_utf8_lossy(&out.stdout),
+            &String::from_utf8_lossy(&out.stderr),
+            None,
+        ),
+        Err(e) => emit_command_log(
+            "gp",
+            &full_args,
+            started_at,
+            -1,
+            "",
+            "",
+            Some(&e.to_string()),
+        ),
+    }
+
+    let out = result.map_err(|e| if e.kind() == std::io::ErrorKind::NotFound {
+        ServiceError::NotFound("gp".into())
+    } else {
+        ServiceError::Io(e)
+    })?;
 
     Ok(CommandResult {
         stdout: String::from_utf8_lossy(&out.stdout).into_owned(),
@@ -96,13 +112,12 @@ fn parse_cplc(text: &str) -> Option<Cplc> {
             .and_then(|l| l.split('=').nth(1))
             .map(|s| s.split_whitespace().next().unwrap_or("").to_string())
     };
-
     Some(Cplc {
-        ic_fabricator:        pick("ICFabricator")?,
-        ic_type:              pick("ICType")?,
-        os_id:                pick("OperatingSystemID")?,
-        ic_serial_number:     pick("ICSerialNumber")?,
-        ic_batch_identifier:  pick("ICBatchIdentifier").unwrap_or_default(),
+        ic_fabricator:       pick("ICFabricator")?,
+        ic_type:             pick("ICType")?,
+        os_id:               pick("OperatingSystemID")?,
+        ic_serial_number:    pick("ICSerialNumber")?,
+        ic_batch_identifier: pick("ICBatchIdentifier").unwrap_or_default(),
     })
 }
 
@@ -115,9 +130,7 @@ fn parse_applets(text: &str) -> Vec<Applet> {
             .or_else(|| trimmed.strip_prefix("APP:"))
             .or_else(|| trimmed.strip_prefix("PKG:"))
         {
-            if let Some(c) = current.take() {
-                out.push(c);
-            }
+            if let Some(c) = current.take() { out.push(c); }
             let kind = if trimmed.starts_with("ISD:") { "ISD" }
                        else if trimmed.starts_with("APP:") { "APP" }
                        else { "PKG" }.to_string();
@@ -129,9 +142,7 @@ fn parse_applets(text: &str) -> Vec<Applet> {
                 .unwrap_or_else(|| "UNKNOWN".into());
             current = Some(Applet { aid, state, parent: None, privileges: None, kind });
         } else if let Some(parent) = trimmed.strip_prefix("Parent:") {
-            if let Some(ref mut c) = current {
-                c.parent = Some(parent.trim().to_string());
-            }
+            if let Some(ref mut c) = current { c.parent = Some(parent.trim().to_string()); }
         } else if let Some(privs) = trimmed.strip_prefix("Privs:") {
             if let Some(ref mut c) = current {
                 c.privileges = Some(privs.split(',').map(|s| s.trim().to_string()).collect());
@@ -142,7 +153,6 @@ fn parse_applets(text: &str) -> Vec<Applet> {
     out
 }
 
-/// gp --install <cap> with optional package/applet/instance AIDs.
 pub async fn install_cap(
     reader: &str,
     key_hex: Option<&str>,
@@ -157,12 +167,10 @@ pub async fn install_cap(
     run_gp(Some(reader), key_hex, &args).await
 }
 
-/// gp --uninstall <package-aid>
 pub async fn uninstall_package(reader: &str, key_hex: Option<&str>, package_aid: &str) -> Result<CommandResult> {
     run_gp(Some(reader), key_hex, &["--uninstall", package_aid]).await
 }
 
-/// gp --lock <new-key-hex>
 pub async fn lock_to_key(reader: &str, current_key: Option<&str>, new_key_hex: &str) -> Result<CommandResult> {
     run_gp(Some(reader), current_key, &["--lock", new_key_hex]).await
 }

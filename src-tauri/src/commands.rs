@@ -21,7 +21,7 @@ pub async fn inspect_card(reader: String) -> Result<pcsc::CardInfo> {
 
 #[tauri::command]
 pub fn list_gp_keys() -> Result<Vec<vault::GpKeyHandle>> {
-    Ok(vec![])
+    vault::list()
 }
 
 #[tauri::command]

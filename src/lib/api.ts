@@ -95,6 +95,24 @@ export const runIssuance = (
 
 // ---------- Events ----------
 
+export interface CommandLogEntry {
+  id: string;
+  startedAt: string;
+  finishedAt: string;
+  durationMs: number;
+  program: string;
+  args: string[];
+  exitCode: number;
+  stdout: string;
+  stderr: string;
+  error: string | null;
+}
+
+export const onCommandLog = (
+  callback: (entry: CommandLogEntry) => void,
+): Promise<UnlistenFn> =>
+  listen<CommandLogEntry>("command:log", (e) => callback(e.payload));
+
 export const onIssuanceProgress = (
   callback: (report: IssuanceReport) => void,
 ): Promise<UnlistenFn> =>
