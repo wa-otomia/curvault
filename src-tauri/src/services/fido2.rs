@@ -8,14 +8,6 @@ use serde::{Deserialize, Serialize};
 use tokio::process::Command;
 
 fn map_fido_error(stderr: &str) -> Option<String> {
-    if stderr.contains("FIDO_ERR_INTERNAL") {
-        return Some(
-            "Cannot open this device as a FIDO2 authenticator. \
-             libfido2 on macOS does not bridge PC/SC readers (such as PaSoRi) \
-             to CTAP2 — connect a native USB / NFC FIDO2 token directly."
-                .into(),
-        );
-    }
     if stderr.contains("FIDO_ERR_NO_CREDENTIALS") {
         return Some("No resident credentials on this device.".into());
     }
@@ -103,38 +95,70 @@ pub async fn list_devices() -> Result<Vec<Fido2Device>> {
 }
 
 fn parse_device_list(text: &str) -> Vec<Fido2Device> {
-    // Lines look like:
-    // ioreg://4295033394: vendor=0x1050, product=0x0407 (Yubico YubiKey...)
-    // /dev/hidraw0: vendor=0x1050, product=0x0407 (Yubico YubiKey...)
+    // libfido2 reports each device on one line. The path can be a URL-style
+    // identifier with its own colons:
+    //   pcsc://slot0: vendor=0x0000, product=0x0000 (PC/SC SONY FeliCa Port/PaSoRi 4.0)
+    //   ioreg://4295033394: vendor=0x1050, product=0x0407 (Yubico YubiKey ...)
+    //   /dev/hidraw0: vendor=0x1050, product=0x0407 (Yubico ...)
+    //
+    // Splitting on the first ':' would chop pcsc:// in half, so anchor on
+    // the well-known ": vendor=" delimiter instead.
     let mut out = Vec::new();
     for line in text.lines() {
-        let (path, rest) = match line.split_once(':') {
-            Some(t) => t,
+        let line = line.trim();
+        if line.is_empty() {
+            continue;
+        }
+        let (path, rest) = match line.find(": vendor=") {
+            Some(i) => (line[..i].to_string(), &line[i + 2..]),
             None => continue,
         };
+
         let mut vendor = String::new();
-        let mut product = String::new();
+        let mut product_id = String::new();
         for chunk in rest.split(',') {
             let chunk = chunk.trim();
             if let Some(v) = chunk.strip_prefix("vendor=") {
-                vendor = v.trim().to_string();
+                vendor = v.split_whitespace().next().unwrap_or("").to_string();
             }
             if let Some(p) = chunk.strip_prefix("product=") {
-                product = p.trim().to_string();
+                product_id = p.split_whitespace().next().unwrap_or("").to_string();
             }
         }
-        if let Some(idx) = rest.find('(') {
-            if let Some(end) = rest.find(')') {
-                product = rest[idx + 1..end].to_string();
-            }
-        }
-        out.push(Fido2Device {
-            path: path.trim().to_string(),
-            product,
-            vendor,
-        });
+
+        // The friendly name lives in parentheses at the end of the line.
+        let product = match (rest.find('('), rest.rfind(')')) {
+            (Some(open), Some(close)) if close > open => rest[open + 1..close].to_string(),
+            _ => product_id,
+        };
+
+        out.push(Fido2Device { path, product, vendor });
     }
     out
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parses_pcsc_url_path() {
+        let s = "pcsc://slot0: vendor=0x0000, product=0x0000 (PC/SC SONY FeliCa Port/PaSoRi 4.0)\n";
+        let d = parse_device_list(s);
+        assert_eq!(d.len(), 1);
+        assert_eq!(d[0].path, "pcsc://slot0");
+        assert_eq!(d[0].vendor, "0x0000");
+        assert_eq!(d[0].product, "PC/SC SONY FeliCa Port/PaSoRi 4.0");
+    }
+
+    #[test]
+    fn parses_hid_path() {
+        let s = "/dev/hidraw0: vendor=0x1050, product=0x0407 (Yubico YubiKey 5)\n";
+        let d = parse_device_list(s);
+        assert_eq!(d.len(), 1);
+        assert_eq!(d[0].path, "/dev/hidraw0");
+        assert_eq!(d[0].product, "Yubico YubiKey 5");
+    }
 }
 
 /// `fido2-token -I <device>` -> info.
