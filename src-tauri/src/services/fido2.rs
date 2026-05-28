@@ -295,6 +295,11 @@ pub async fn list_credentials(device_path: &str, pin: &str) -> Result<Vec<Reside
     }
 
     // Step 2: per-RP credential enumeration.
+    //
+    // libfido2 prints each credential as:
+    //     <idx>: <cred_id_b64> <display_name|(null)> <user_id_b64> <algo> <uv-flag> <pay-flag>
+    // — index has a trailing colon, the other fields are space-separated
+    // (display_name can be the literal token `(null)` when not set).
     let mut creds = Vec::new();
     for rp_id in rps {
         let (out, _err, code) =
@@ -303,19 +308,79 @@ pub async fn list_credentials(device_path: &str, pin: &str) -> Result<Vec<Reside
         for cred_line in out.lines() {
             let trimmed = cred_line.trim();
             if trimmed.is_empty() { continue; }
-            // Columns are colon-separated; layout (libfido2 1.13+):
-            //   <idx>: <user_id_b64>: <cred_id_b64>: <type>
-            let parts: Vec<&str> = trimmed.splitn(4, ':').map(|s| s.trim()).collect();
-            if parts.len() < 3 { continue; }
+
+            let parts: Vec<&str> = trimmed.split_whitespace().collect();
+            // Need at least: idx + cred_id + display + user_id
+            if parts.len() < 4 { continue; }
+            if !parts[0].ends_with(':') { continue; } // skip non-row lines
+
+            let cred_id = parts[1].to_string();
+            let display_name = match parts[2] {
+                "(null)" | "(NULL)" => None,
+                s => Some(s.to_string()),
+            };
+            let user_id = parts[3].to_string();
+
             creds.push(ResidentCredential {
                 rp_id: rp_id.clone(),
-                user_name: parts.get(1).map(|s| s.to_string()).filter(|s| !s.is_empty()),
-                user_display_name: parts.get(3).map(|s| s.to_string()),
-                credential_id: parts.get(2).unwrap_or(&"").to_string(),
+                user_name: if user_id.is_empty() { None } else { Some(user_id) },
+                user_display_name: display_name,
+                credential_id: cred_id,
             });
         }
     }
     Ok(creds)
+}
+
+#[cfg(test)]
+mod credential_parser_tests {
+    use super::*;
+
+    fn parse_one(line: &str) -> Option<ResidentCredential> {
+        let mut creds = Vec::new();
+        let rp_id = "example.org".to_string();
+        let trimmed = line.trim();
+        let parts: Vec<&str> = trimmed.split_whitespace().collect();
+        if parts.len() < 4 { return None; }
+        if !parts[0].ends_with(':') { return None; }
+        let cred_id = parts[1].to_string();
+        let display_name = match parts[2] {
+            "(null)" | "(NULL)" => None,
+            s => Some(s.to_string()),
+        };
+        let user_id = parts[3].to_string();
+        creds.push(ResidentCredential {
+            rp_id: rp_id.clone(),
+            user_name: if user_id.is_empty() { None } else { Some(user_id) },
+            user_display_name: display_name,
+            credential_id: cred_id,
+        });
+        creds.into_iter().next()
+    }
+
+    #[test]
+    fn parses_libfido2_credential_row() {
+        let line = "00: DneUwQLQGixi+CMQ7C+RXx/== (null) d2ViYXV0aG5pby12YWFn es256 uvopt nopay";
+        let c = parse_one(line).expect("should parse");
+        assert_eq!(c.credential_id, "DneUwQLQGixi+CMQ7C+RXx/==");
+        assert!(c.user_display_name.is_none());
+        assert_eq!(c.user_name.as_deref(), Some("d2ViYXV0aG5pby12YWFn"));
+    }
+
+    #[test]
+    fn parses_row_with_display_name() {
+        let line = "02: abc== Alice xyz== es256 uvopt nopay";
+        let c = parse_one(line).expect("should parse");
+        assert_eq!(c.credential_id, "abc==");
+        assert_eq!(c.user_display_name.as_deref(), Some("Alice"));
+        assert_eq!(c.user_name.as_deref(), Some("xyz=="));
+    }
+
+    #[test]
+    fn skips_non_row_line() {
+        assert!(parse_one("Enter PIN for pcsc://slot0:").is_none());
+        assert!(parse_one("").is_none());
+    }
 }
 
 /// `fido2-token -D -i <cred_id> <device>` (PIN provided via env var so it
