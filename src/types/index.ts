@@ -22,14 +22,13 @@ export interface CardInfo {
 
 export interface Applet {
   aid: string;
-  state: "OP_READY" | "INITIALIZED" | "SECURED" | "LOCKED" | "TERMINATED" | "SELECTABLE" | "INSTALLED" | "LOADED";
+  state: string;
   parent?: string;
   privileges?: string[];
   kind: "ISD" | "APP" | "PKG";
 }
 
 export interface GpKeyHandle {
-  /** Stable identifier; format `gp-key:<card-serial>` or `gp-key:<uuid>`. */
   id: string;
   cardSerial?: string;
   algorithm: "SCP02" | "SCP03";
@@ -72,8 +71,8 @@ export interface KeyPlanEntry {
   slotId: number;
   label: string;
   type: "rsa" | "ec";
-  size: number;        // e.g. 2048 for RSA, 256 for EC P-256
-  curve?: string;      // e.g. "prime256v1"
+  size: number;
+  curve?: string;
   certValidityDays: number;
   certSubjectTemplate: string;
 }
@@ -107,4 +106,60 @@ export interface CommandResult {
   stdout: string;
   stderr: string;
   exitCode: number;
+}
+
+// ---------- PKCS#15 init ----------
+
+export interface Pkcs15InitRequest {
+  reader: string;
+  label: string;
+  manufacturer: string;
+  serial: string;
+  pin: string;
+  puk: string;
+  profileDirOverride?: string;
+}
+
+export interface Pkcs15InitResult {
+  stdout: string;
+  stderr: string;
+  exitCode: number;
+  credentialsVaultId: string;
+}
+
+// ---------- FIDO2 ----------
+
+export interface Fido2Device {
+  path: string;
+  product: string;
+  vendor: string;
+}
+
+export interface Fido2Info {
+  path: string;
+  aaguid?: string;
+  versions: string[];
+  extensions: string[];
+  options: [string, boolean][];
+  pinRetries?: number;
+  uvRetries?: number;
+}
+
+export interface ResidentCredential {
+  rpId: string;
+  userName?: string;
+  userDisplayName?: string;
+  credentialId: string;
+}
+
+export interface DeleteCredentialRequest {
+  devicePath: string;
+  credentialId: string;
+  pin: string;
+}
+
+export interface SetPinRequest {
+  devicePath: string;
+  oldPin?: string;
+  newPin: string;
 }

@@ -1,6 +1,6 @@
 //! Tauri command surface. All `invoke()` calls from the renderer enter here.
 
-use crate::services::{gp, opensc, pcsc, profile, vault, issuance};
+use crate::services::{gp, opensc, pcsc, profile, vault, issuance, pkcs15, fido2};
 use crate::services::Result;
 use serde::Deserialize;
 use std::collections::HashMap;
@@ -21,8 +21,6 @@ pub async fn inspect_card(reader: String) -> Result<pcsc::CardInfo> {
 
 #[tauri::command]
 pub fn list_gp_keys() -> Result<Vec<vault::GpKeyHandle>> {
-    // For early-stage development we keep handle metadata co-located with
-    // profiles. A separate store will land before v0.2.
     Ok(vec![])
 }
 
@@ -39,7 +37,6 @@ pub fn delete_gp_key(id: String) -> Result<()> {
 #[tauri::command]
 pub async fn lock_gp_key(reader: String, key_id: String) -> Result<gp::CommandResult> {
     let new_key = vault::read_key_hex(&key_id)?;
-    // Pass None for current key → gp defaults to test keys.
     let r = gp::lock_to_key(&reader, None, &new_key).await?;
     if r.exit_code != 0 {
         return Err(crate::services::ServiceError::Command(
@@ -109,6 +106,45 @@ pub fn save_profile(profile: profile::Profile) -> Result<()> {
 #[tauri::command]
 pub fn delete_profile(id: String) -> Result<()> {
     profile::delete(&id)
+}
+
+// ---------- PKCS#15 init ----------
+
+#[tauri::command]
+pub async fn pkcs15_create(req: pkcs15::Pkcs15InitRequest) -> Result<pkcs15::Pkcs15InitResult> {
+    pkcs15::create(req).await
+}
+
+// ---------- FIDO2 ----------
+
+#[tauri::command]
+pub async fn fido2_list_devices() -> Result<Vec<fido2::Fido2Device>> {
+    fido2::list_devices().await
+}
+
+#[tauri::command]
+pub async fn fido2_info(path: String) -> Result<fido2::Fido2Info> {
+    fido2::info(&path).await
+}
+
+#[tauri::command]
+pub async fn fido2_list_credentials(device_path: String, pin: String) -> Result<Vec<fido2::ResidentCredential>> {
+    fido2::list_credentials(&device_path, &pin).await
+}
+
+#[tauri::command]
+pub async fn fido2_delete_credential(req: fido2::DeleteCredentialRequest) -> Result<()> {
+    fido2::delete_credential(req).await
+}
+
+#[tauri::command]
+pub async fn fido2_set_pin(req: fido2::SetPinRequest) -> Result<()> {
+    fido2::set_pin(req).await
+}
+
+#[tauri::command]
+pub async fn fido2_reset(device_path: String) -> Result<()> {
+    fido2::reset(&device_path).await
 }
 
 // ---------- Issuance ----------

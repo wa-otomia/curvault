@@ -4,6 +4,8 @@ pub mod pcsc;
 pub mod vault;
 pub mod profile;
 pub mod issuance;
+pub mod pkcs15;
+pub mod fido2;
 
 use thiserror::Error;
 

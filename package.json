@@ -1,9 +1,9 @@
 {
-  "name": "smartcard-issuer",
+  "name": "curvault",
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Desktop card-issuance workstation for IsoApplet / JavaCard.",
+  "description": "Curvault — desktop card-issuance workstation for IsoApplet / JavaCard / FIDO2.",
   "author": "wa-otomia",
   "license": "MIT",
   "scripts": {
@@ -11,7 +11,8 @@
     "build": "tsc -b && vite build",
     "preview": "vite preview",
     "tauri": "tauri",
-    "typecheck": "tsc -b --noEmit"
+    "typecheck": "tsc -b --noEmit",
+    "icons": "python3 scripts/render-icons.py"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.1.0",

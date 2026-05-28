@@ -5,7 +5,9 @@ import Dashboard from "./views/Dashboard";
 import ReadersView from "./views/ReadersView";
 import GpKeysView from "./views/GpKeysView";
 import AppletInstallerView from "./views/AppletInstallerView";
+import Pkcs15View from "./views/Pkcs15View";
 import ProfilesView from "./views/ProfilesView";
+import Fido2View from "./views/Fido2View";
 import IssuanceView from "./views/IssuanceView";
 
 export default function App() {
@@ -20,7 +22,9 @@ export default function App() {
           {view === "readers" && <ReadersView />}
           {view === "gp-keys" && <GpKeysView />}
           {view === "installer" && <AppletInstallerView />}
+          {view === "pkcs15" && <Pkcs15View />}
           {view === "profiles" && <ProfilesView />}
+          {view === "fido2" && <Fido2View />}
           {view === "issuance" && <IssuanceView />}
         </div>
         <StatusBar />

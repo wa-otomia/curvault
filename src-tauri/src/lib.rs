@@ -18,6 +18,13 @@ pub fn run() {
             commands::list_profiles,
             commands::save_profile,
             commands::delete_profile,
+            commands::pkcs15_create,
+            commands::fido2_list_devices,
+            commands::fido2_info,
+            commands::fido2_list_credentials,
+            commands::fido2_delete_credential,
+            commands::fido2_set_pin,
+            commands::fido2_reset,
             commands::run_issuance,
         ])
         .run(tauri::generate_context!())

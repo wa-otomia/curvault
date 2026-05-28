@@ -1,13 +1,13 @@
 [package]
-name = "smartcard-issuer"
+name = "curvault"
 version = "0.1.0"
-description = "Desktop card-issuance workstation for IsoApplet / JavaCard."
+description = "Curvault — desktop card-issuance workstation for IsoApplet / JavaCard / FIDO2."
 authors = ["wa-otomia"]
 edition = "2021"
 rust-version = "1.75"
 
 [lib]
-name = "smartcard_issuer_lib"
+name = "curvault_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]

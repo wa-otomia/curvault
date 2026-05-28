@@ -63,7 +63,7 @@ pub async fn run(
                 status: "running".into(),
                 detail: None,
             };
-            let result: Result<Option<String>> = (|| $body)().await;
+            let result: Result<Option<String>> = async { $body }.await;
             s.finished_at = Some(Utc::now().to_rfc3339());
             match result {
                 Ok(detail) => { s.status = "ok".into(); s.detail = detail; }

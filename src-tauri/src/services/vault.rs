@@ -16,7 +16,7 @@ use keyring::Entry;
 use rand::RngCore;
 use serde::{Deserialize, Serialize};
 
-const SERVICE: &str = "com.waotomia.smartcard-issuer";
+const SERVICE: &str = "com.waotomia.curvault";
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]

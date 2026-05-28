@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2.0.0",
-  "productName": "Smartcard Issuer",
+  "productName": "Curvault",
   "version": "0.1.0",
-  "identifier": "com.waotomia.smartcard-issuer",
+  "identifier": "com.waotomia.curvault",
   "build": {
     "frontendDist": "../dist",
     "devUrl": "http://localhost:5173",
@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "Smartcard Issuer",
+        "title": "Curvault",
         "width": 1200,
         "height": 800,
         "minWidth": 900,
@@ -37,6 +37,6 @@
     ],
     "category": "DeveloperTool",
     "shortDescription": "Issue and manage IsoApplet smart cards.",
-    "longDescription": "A desktop workstation for personalizing JavaCard smart cards: manages GlobalPlatform keys in the OS keychain, installs applets via embedded gp, runs PKCS#15 init and generates per-card key + certificate sets according to user-defined profiles."
+    "longDescription": "Curvault is a desktop workstation for personalizing JavaCard smart cards: manages GlobalPlatform keys in the OS keychain, installs applets via embedded gp, drives pkcs15-init with custom token info (label / manufacturer / serial), generates per-card key + certificate sets according to user-defined profiles, and manages FIDO2 authenticators."
   }
 }
