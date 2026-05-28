@@ -2,7 +2,7 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 
 // https://vitejs.dev/config/
-export default defineConfig(async () => ({
+export default defineConfig({
   plugins: [react()],
 
   // Vite dev server is fronted by Tauri; bind to a known port so the Rust
@@ -12,7 +12,6 @@ export default defineConfig(async () => ({
     port: 5173,
     strictPort: true,
     watch: {
-      // Tauri's own files don't need Vite HMR
       ignored: ["**/src-tauri/**"],
     },
   },
@@ -23,4 +22,4 @@ export default defineConfig(async () => ({
     minify: !process.env.TAURI_DEBUG ? "esbuild" : false,
     sourcemap: !!process.env.TAURI_DEBUG,
   },
-}));
+});

@@ -194,7 +194,9 @@ fn map_io(prog: &str) -> impl Fn(std::io::Error) -> ServiceError + '_ {
     }
 }
 
-/// Convenience: read back a credentials handle (used by issuance flow).
+/// Convenience: read back a credentials handle (used by issuance flow once
+/// it stops being a skeleton).
+#[allow(dead_code)]
 pub fn read_credentials(id: &str) -> Result<(String, String)> {
     let pin = keyring::Entry::new(SERVICE, &format!("pkcs15:{id}:pin"))?
         .get_password()?;

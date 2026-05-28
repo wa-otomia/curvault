@@ -52,6 +52,8 @@ pub async fn lock_gp_key(reader: String, key_id: String) -> Result<gp::CommandRe
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
+#[allow(dead_code)] // package_aid / applet_aid are accepted from the UI for
+                    // record-keeping; gp --install derives them from the CAP.
 pub struct InstallParams {
     pub cap_path: String,
     pub package_aid: String,
