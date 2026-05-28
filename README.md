@@ -1,15 +1,18 @@
-# Curvault
+<p align="center">
+  <img src="src-tauri/icons/icon.png" width="156" height="156" alt="Curvault" />
+</p>
 
-Desktop card-issuance workstation for **IsoApplet / JavaCard** and
-**FIDO2 authenticators**.
-
-Built with **Tauri 2 + React 18 + TypeScript**. Everything — GP key
-handling, applet installation, PKCS#15 init, profile management, FIDO2
-credential management, full issuance flow — happens inside the app.
-Secrets never leave the OS keychain.
+<h1 align="center">Curvault</h1>
 
 <p align="center">
-  <img src="src-tauri/icons/icon.svg" width="120" height="120" alt="Curvault" />
+  Desktop card-issuance workstation for IsoApplet / JavaCard and FIDO2 authenticators.
+</p>
+
+<p align="center">
+  Built with <strong>Tauri 2 + React 18 + TypeScript</strong>. GP key
+  handling, applet installation, PKCS#15 init, profile management, FIDO2
+  credential management, and the full issuance flow all happen inside the
+  app — secrets never leave the OS keychain.
 </p>
 
 ## Features
@@ -25,6 +28,8 @@ Secrets never leave the OS keychain.
 | FIDO2 | List devices / credentials, set PIN, delete creds, factory reset |
 | Issuance | End-to-end flow with timeline + per-step audit |
 | Card Sticker | Generate Curvault-branded PNG stickers with QR-encoded serial |
+| PKCS#15 Objects | Live `pkcs15-tool --dump` of an inserted card |
+| PKCS#11 Objects | Live `pkcs11-tool --list-slots --list-objects` against the OpenSC module |
 
 ## Prerequisites
 

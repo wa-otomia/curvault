@@ -75,6 +75,17 @@ export default function ProfilesView() {
         <button className="primary" onClick={startNew}>+ New profile</button>
       </div>
 
+      <div className="card" style={{ borderColor: "rgba(54,197,255,0.2)" }}>
+        <p style={{ margin: 0, color: "var(--text-dim)", fontSize: 13, lineHeight: 1.55 }}>
+          A profile defines what an issued card should look like: the PKCS#15
+          token info (label, manufacturer ID, serial scheme), PIN / PUK
+          policy, the set of keys to provision, and the CA endpoint. These
+          values are fed to <code>pkcs15-init</code> via a synthesized OpenSC
+          profile directory at issuance time — so think of this as the
+          <strong> issuer-side template for the OpenSC pkcs15-init profile</strong>.
+        </p>
+      </div>
+
       {err && <div className="card" style={{ borderColor: "var(--error)" }}><pre>{err}</pre></div>}
 
       <div className="card">

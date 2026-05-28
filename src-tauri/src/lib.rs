@@ -144,6 +144,8 @@ pub fn run() {
             commands::save_profile,
             commands::delete_profile,
             commands::pkcs15_create,
+            commands::pkcs15_dump,
+            commands::pkcs11_dump,
             commands::fido2_list_devices,
             commands::fido2_info,
             commands::fido2_list_credentials,

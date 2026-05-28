@@ -1,25 +1,23 @@
 import { useEffect, useState } from "react";
 import { listReaders } from "../lib/api";
 
+// Refresh policy: one-shot on mount. Polling every few seconds floods the
+// command log with noise and rarely surfaces a real state change — readers
+// don't appear / disappear that often. The Readers view has its own
+// explicit Refresh button for when the user actually wants to recheck.
 export default function StatusBar() {
   const [readerCount, setReaderCount] = useState<number | null>(null);
   const [cardCount, setCardCount] = useState<number | null>(null);
   const [err, setErr] = useState<string | null>(null);
 
   useEffect(() => {
-    const refresh = async () => {
-      try {
-        const readers = await listReaders();
+    listReaders()
+      .then((readers) => {
         setReaderCount(readers.length);
         setCardCount(readers.filter((r) => r.hasCard).length);
         setErr(null);
-      } catch (e: unknown) {
-        setErr(String(e));
-      }
-    };
-    refresh();
-    const t = setInterval(refresh, 3000);
-    return () => clearInterval(t);
+      })
+      .catch((e: unknown) => setErr(String(e)));
   }, []);
 
   return (
@@ -38,7 +36,7 @@ export default function StatusBar() {
           </>
         )}
       </span>
-      <span>v0.1.0</span>
+      <span>Curvault · v0.1.3</span>
     </div>
   );
 }

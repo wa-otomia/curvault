@@ -64,6 +64,12 @@ export const deleteProfile = (id: string): Promise<void> =>
 export const pkcs15Create = (req: Pkcs15InitRequest): Promise<Pkcs15InitResult> =>
   invoke("pkcs15_create", { req });
 
+export const pkcs15Dump = (reader: string): Promise<string> =>
+  invoke("pkcs15_dump", { reader });
+
+export const pkcs11Dump = (module?: string): Promise<string> =>
+  invoke("pkcs11_dump", { module });
+
 // ---------- FIDO2 ----------
 
 export const fido2ListDevices = (): Promise<Fido2Device[]> =>

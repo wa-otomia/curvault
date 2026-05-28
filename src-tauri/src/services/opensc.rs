@@ -106,6 +106,102 @@ fn parse_reader_list(text: &str) -> Vec<Reader> {
     out
 }
 
+/// `pkcs15-tool --reader <r> --dump` → dump of all PKCS#15 objects.
+pub async fn dump_pkcs15(reader: &str) -> Result<String> {
+    let started_at = chrono::Utc::now();
+    let args = ["--reader", reader, "--dump"];
+    let res = Command::new("pkcs15-tool").args(args).output().await;
+
+    match &res {
+        Ok(out) => emit_command_log(
+            "pkcs15-tool", &args, started_at,
+            out.status.code().unwrap_or(-1),
+            &String::from_utf8_lossy(&out.stdout),
+            &String::from_utf8_lossy(&out.stderr),
+            None,
+        ),
+        Err(e) => emit_command_log(
+            "pkcs15-tool", &args, started_at, -1, "", "", Some(&e.to_string()),
+        ),
+    }
+
+    let out = res.map_err(|e| if e.kind() == std::io::ErrorKind::NotFound {
+        ServiceError::NotFound("pkcs15-tool".into())
+    } else {
+        ServiceError::Io(e)
+    })?;
+    if !out.status.success() {
+        return Err(ServiceError::Command(
+            "pkcs15-tool --dump".into(),
+            out.status.code().unwrap_or(-1),
+            String::from_utf8_lossy(&out.stderr).into_owned(),
+        ));
+    }
+    Ok(String::from_utf8_lossy(&out.stdout).into_owned())
+}
+
+/// Try a list of well-known opensc-pkcs11 module paths and return the first
+/// one that actually exists on disk.
+fn detect_pkcs11_module() -> Option<String> {
+    let candidates = [
+        "/opt/homebrew/lib/opensc-pkcs11.so",
+        "/usr/local/lib/opensc-pkcs11.so",
+        "/usr/lib/x86_64-linux-gnu/opensc-pkcs11.so",
+        "/usr/lib/opensc-pkcs11.so",
+        "/usr/lib64/opensc-pkcs11.so",
+        "C:\\Program Files\\OpenSC Project\\OpenSC\\pkcs11\\opensc-pkcs11.dll",
+    ];
+    for p in candidates {
+        if std::path::Path::new(p).exists() {
+            return Some(p.to_string());
+        }
+    }
+    None
+}
+
+/// `pkcs11-tool --module ... --list-slots --list-objects` → text dump.
+pub async fn dump_pkcs11(module: Option<&str>) -> Result<String> {
+    let resolved = match module {
+        Some(m) => m.to_string(),
+        None => detect_pkcs11_module().ok_or_else(|| {
+            ServiceError::Other(
+                "opensc-pkcs11 module not found in standard locations; \
+                 install OpenSC or pass the module path explicitly.".into(),
+            )
+        })?,
+    };
+
+    let started_at = chrono::Utc::now();
+    let args = ["--module", &resolved, "--list-slots", "--list-objects"];
+    let res = Command::new("pkcs11-tool").args(args).output().await;
+
+    match &res {
+        Ok(out) => emit_command_log(
+            "pkcs11-tool", &args, started_at,
+            out.status.code().unwrap_or(-1),
+            &String::from_utf8_lossy(&out.stdout),
+            &String::from_utf8_lossy(&out.stderr),
+            None,
+        ),
+        Err(e) => emit_command_log(
+            "pkcs11-tool", &args, started_at, -1, "", "", Some(&e.to_string()),
+        ),
+    }
+
+    let out = res.map_err(|e| if e.kind() == std::io::ErrorKind::NotFound {
+        ServiceError::NotFound("pkcs11-tool".into())
+    } else {
+        ServiceError::Io(e)
+    })?;
+    Ok(format!(
+        "module: {}\n\n{}{}",
+        resolved,
+        String::from_utf8_lossy(&out.stdout),
+        if out.stderr.is_empty() { String::new() }
+        else { format!("\n--- stderr ---\n{}", String::from_utf8_lossy(&out.stderr)) },
+    ))
+}
+
 /// `opensc-tool -an -r <reader>` → ATR of card in given reader.
 pub async fn read_atr(reader: &str) -> Result<Option<String>> {
     let started_at = chrono::Utc::now();

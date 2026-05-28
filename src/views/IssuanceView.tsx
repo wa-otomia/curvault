@@ -49,6 +49,24 @@ export default function IssuanceView() {
     <>
       <h2>Issuance</h2>
 
+      <div className="card" style={{ borderColor: "rgba(54,197,255,0.2)" }}>
+        <h3 style={{ color: "var(--accent)" }}>What this does</h3>
+        <p style={{ margin: 0, color: "var(--text-dim)", fontSize: 13, lineHeight: 1.55 }}>
+          End-to-end card personalization in one click: pick a card, pick a
+          Profile, and the workstation runs the full pipeline —
+          <strong> install applet → init PKCS#15 → generate keys → request
+          certs from your CA → write certs back → rotate GP key → verify.</strong>
+          {" "}Every step shows up in the timeline below, and a per-card audit
+          entry is recorded.
+        </p>
+        <p style={{ marginTop: "0.5rem", color: "var(--warn)", fontSize: 12 }}>
+          ⚠️ v0.1.x is a working skeleton — several steps (CA call, PKCS#11
+          signing test) still emit TODO stubs. Use Readers / GP Keys / Applet
+          Installer / PKCS#15 Init individually for full control until the
+          pipeline lights up.
+        </p>
+      </div>
+
       <div className="card">
         <div className="row">
           <div className="field" style={{ flex: 1 }}>

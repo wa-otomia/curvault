@@ -117,6 +117,16 @@ pub async fn pkcs15_create(req: pkcs15::Pkcs15InitRequest) -> Result<pkcs15::Pkc
     pkcs15::create(req).await
 }
 
+#[tauri::command]
+pub async fn pkcs15_dump(reader: String) -> Result<String> {
+    opensc::dump_pkcs15(&reader).await
+}
+
+#[tauri::command]
+pub async fn pkcs11_dump(module: Option<String>) -> Result<String> {
+    opensc::dump_pkcs11(module.as_deref()).await
+}
+
 // ---------- FIDO2 ----------
 
 #[tauri::command]
