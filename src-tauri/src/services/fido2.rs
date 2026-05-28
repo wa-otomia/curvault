@@ -211,7 +211,7 @@ pub async fn list_credentials(device_path: &str, pin: &str) -> Result<Vec<Reside
 /// `fido2-token -D -i <cred_id> <device>` (PIN provided via env var so it
 /// stays off argv).
 pub async fn delete_credential(req: DeleteCredentialRequest) -> Result<()> {
-    let out = Command::new("fido2-token")
+    let mut out = Command::new("fido2-token")
         .args(["-D", "-i", &req.credential_id, &req.device_path])
         .env("FIDO_DEVTIMEOUT", "10")
         // PIN is read from stdin by fido2-token when -p not given. We write it.
@@ -223,8 +223,8 @@ pub async fn delete_credential(req: DeleteCredentialRequest) -> Result<()> {
     if let Some(mut stdin) = out.stdin.take() {
         stdin.write_all(req.pin.as_bytes()).await?;
         stdin.write_all(b"\n").await?;
+        // stdin dropped here closes the pipe, signalling EOF to the child.
     }
-    drop(out.stdin.take());
     let result = out.wait_with_output().await?;
     if !result.status.success() {
         return Err(ServiceError::Command(
@@ -249,7 +249,7 @@ pub async fn set_pin(req: SetPinRequest) -> Result<()> {
         .stdin(std::process::Stdio::piped())
         .stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::piped());
-    let child = cmd.spawn()?;
+    let mut child = cmd.spawn()?;
     use tokio::io::AsyncWriteExt;
     if let Some(mut stdin) = child.stdin.take() {
         if let Some(old) = &req.old_pin {
