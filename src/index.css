@@ -238,6 +238,25 @@ pre {
   overflow: auto;
 }
 
+/* Consistent spacing for top-level page chrome.
+ *
+ * Every view follows the same skeleton — an optional <h2> or a header row
+ * that mixes <h2> with action buttons, then one or more <.card>s. We only
+ * target direct children of .content so nested .row inside a .card stays
+ * compact, while top-level headers always get breathing room before the
+ * first card.
+ */
+.content > h2 {
+  margin: 0 0 1rem;
+  font-size: 20px;
+  font-weight: 600;
+  letter-spacing: 0.2px;
+}
+
+.content > .row {
+  margin-bottom: 1rem;
+}
+
 .statusbar {
   border-top: 1px solid var(--border);
   background: var(--bg-elev);
