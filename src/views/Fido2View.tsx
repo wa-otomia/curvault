@@ -8,6 +8,7 @@ import {
   fido2Reset,
 } from "../lib/api";
 import type { Fido2Device, Fido2Info, ResidentCredential } from "../types";
+import LoadingOverlay from "../components/LoadingOverlay";
 
 export default function Fido2View() {
   const [devices, setDevices] = useState<Fido2Device[]>([]);
@@ -122,6 +123,7 @@ export default function Fido2View() {
 
   return (
     <>
+      <LoadingOverlay show={busy} label="Talking to authenticator…" />
       <div className="row" style={{ justifyContent: "space-between" }}>
         <h2 style={{ margin: 0 }}>FIDO2 Authenticators</h2>
         <button onClick={refreshDevices}>Refresh</button>

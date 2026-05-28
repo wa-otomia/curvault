@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { pkcs11Dump } from "../lib/api";
+import LoadingOverlay from "../components/LoadingOverlay";
 
 export default function Pkcs11ObjectsView() {
   const [module, setModule] = useState("");
@@ -22,6 +23,7 @@ export default function Pkcs11ObjectsView() {
 
   return (
     <>
+      <LoadingOverlay show={busy} label="Querying PKCS#11 module…" />
       <h2>PKCS#11 Objects</h2>
       <div className="card">
         <p style={{ color: "var(--text-dim)", fontSize: 13, marginTop: 0 }}>

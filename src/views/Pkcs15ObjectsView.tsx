@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { listReaders, pkcs15Dump } from "../lib/api";
 import type { Reader } from "../types";
+import LoadingOverlay from "../components/LoadingOverlay";
 
 interface Section {
   name: string;
@@ -60,6 +61,7 @@ export default function Pkcs15ObjectsView() {
 
   return (
     <>
+      <LoadingOverlay show={busy} label="Reading card…" />
       <h2>PKCS#15 Objects</h2>
       <div className="card">
         <p style={{ color: "var(--text-dim)", fontSize: 13, marginTop: 0 }}>

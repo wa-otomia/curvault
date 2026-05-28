@@ -7,6 +7,7 @@
 import { useEffect, useState } from "react";
 import { listReaders, inspectCard } from "../lib/api";
 import type { Reader, CardInfo, Applet } from "../types";
+import LoadingOverlay from "../components/LoadingOverlay";
 
 function tagColor(kind: Applet["kind"]): { bg: string; fg: string; label: string } {
   switch (kind) {
@@ -56,6 +57,7 @@ export default function AppletsView() {
 
   return (
     <>
+      <LoadingOverlay show={busy} label="Reading card…" />
       <div className="row" style={{ justifyContent: "space-between" }}>
         <h2 style={{ margin: 0 }}>Installed Applets</h2>
         <button onClick={() => reader && inspectCard(reader).then(setCard).catch((e) => setErr(String(e)))}>

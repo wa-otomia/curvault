@@ -6,6 +6,7 @@ import {
   onIssuanceProgress,
 } from "../lib/api";
 import type { Reader, Profile, IssuanceReport } from "../types";
+import LoadingOverlay from "../components/LoadingOverlay";
 
 export default function IssuanceView() {
   const [readers, setReaders] = useState<Reader[]>([]);
@@ -47,6 +48,7 @@ export default function IssuanceView() {
 
   return (
     <>
+      <LoadingOverlay show={busy} label="Running issuance pipeline…" />
       <h2>Issuance</h2>
 
       <div className="card" style={{ borderColor: "rgba(54,197,255,0.2)" }}>

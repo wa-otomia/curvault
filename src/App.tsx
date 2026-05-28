@@ -20,24 +20,33 @@ export default function App() {
 
   return (
     <>
-      <Sidebar current={view} onSelect={setView} />
-      <div className="main-frame">
-        <div className="content">
-          {view === "dashboard" && <Dashboard />}
-          {view === "readers" && <ReadersView />}
-          {view === "applets" && <AppletsView />}
-          {view === "gp-keys" && <GpKeysView />}
-          {view === "installer" && <AppletInstallerView />}
-          {view === "pkcs15" && <Pkcs15View />}
-          {view === "pkcs15-objects" && <Pkcs15ObjectsView />}
-          {view === "pkcs11-objects" && <Pkcs11ObjectsView />}
-          {view === "profiles" && <ProfilesView />}
-          {view === "fido2" && <Fido2View />}
-          {view === "issuance" && <IssuanceView />}
-          {view === "sticker" && <StickerView />}
+      {/* Custom title bar: replaces the native macOS chrome (which
+       * tauri.conf.json sets to overlay style so traffic lights still
+       * show through). The whole strip is draggable; the left 80px
+       * are kept blank so the traffic lights land in clear space.
+       * No text in here — the sidebar brand carries the wordmark. */}
+      <div className="titlebar" data-tauri-drag-region></div>
+
+      <div className="app-body">
+        <Sidebar current={view} onSelect={setView} />
+        <div className="main-frame">
+          <div className="content">
+            {view === "dashboard" && <Dashboard />}
+            {view === "readers" && <ReadersView />}
+            {view === "applets" && <AppletsView />}
+            {view === "gp-keys" && <GpKeysView />}
+            {view === "installer" && <AppletInstallerView />}
+            {view === "pkcs15" && <Pkcs15View />}
+            {view === "pkcs15-objects" && <Pkcs15ObjectsView />}
+            {view === "pkcs11-objects" && <Pkcs11ObjectsView />}
+            {view === "profiles" && <ProfilesView />}
+            {view === "fido2" && <Fido2View />}
+            {view === "issuance" && <IssuanceView />}
+            {view === "sticker" && <StickerView />}
+          </div>
+          <LogPanel />
+          <StatusBar />
         </div>
-        <LogPanel />
-        <StatusBar />
       </div>
     </>
   );

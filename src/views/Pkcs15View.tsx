@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { listReaders, pkcs15Create } from "../lib/api";
 import type { Reader, Pkcs15InitResult } from "../types";
+import LoadingOverlay from "../components/LoadingOverlay";
 
 function randomHex(bytes: number): string {
   const arr = new Uint8Array(bytes);
@@ -67,6 +68,7 @@ export default function Pkcs15View() {
 
   return (
     <>
+      <LoadingOverlay show={busy} label="Initializing PKCS#15…" />
       <h2>PKCS#15 Initialization</h2>
 
       <div className="card">

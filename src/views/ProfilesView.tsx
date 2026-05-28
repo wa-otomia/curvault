@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { listProfiles, saveProfile, deleteProfile } from "../lib/api";
 import type { Profile, KeyPlanEntry } from "../types";
+import LoadingOverlay from "../components/LoadingOverlay";
 
 const blankProfile = (): Profile => ({
   id: crypto.randomUUID(),
@@ -29,13 +30,17 @@ const blankProfile = (): Profile => ({
 export default function ProfilesView() {
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [editing, setEditing] = useState<Profile | null>(null);
+  const [busy, setBusy] = useState(true);
   const [err, setErr] = useState<string | null>(null);
 
   const refresh = async () => {
+    setBusy(true);
     try {
       setProfiles(await listProfiles());
     } catch (e: unknown) {
       setErr(String(e));
+    } finally {
+      setBusy(false);
     }
   };
 
@@ -70,6 +75,7 @@ export default function ProfilesView() {
 
   return (
     <>
+      <LoadingOverlay show={busy} label="Loading profiles…" />
       <div className="row" style={{ justifyContent: "space-between" }}>
         <h2 style={{ margin: 0 }}>Profiles</h2>
         <button className="primary" onClick={startNew}>+ New profile</button>

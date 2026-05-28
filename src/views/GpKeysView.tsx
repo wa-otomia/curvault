@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { listGpKeys, generateGpKey, deleteGpKey, listReaders, lockGpKey } from "../lib/api";
 import type { GpKeyHandle, Reader } from "../types";
+import LoadingOverlay from "../components/LoadingOverlay";
 
 export default function GpKeysView() {
   const [keys, setKeys] = useState<GpKeyHandle[]>([]);
@@ -77,6 +78,7 @@ export default function GpKeysView() {
 
   return (
     <>
+      <LoadingOverlay show={busy} label="Working on key vault…" />
       <h2>GP Keys</h2>
 
       <div className="card">

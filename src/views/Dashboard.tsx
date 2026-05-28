@@ -1,21 +1,25 @@
 import { useEffect, useState } from "react";
 import { listReaders, listProfiles, listGpKeys } from "../lib/api";
 import type { Reader, Profile, GpKeyHandle } from "../types";
+import LoadingOverlay from "../components/LoadingOverlay";
 
 export default function Dashboard() {
   const [readers, setReaders] = useState<Reader[]>([]);
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [keys, setKeys] = useState<GpKeyHandle[]>([]);
+  const [busy, setBusy] = useState(true);
   const [err, setErr] = useState<string | null>(null);
 
   useEffect(() => {
+    setBusy(true);
     Promise.all([listReaders(), listProfiles(), listGpKeys()])
       .then(([r, p, k]) => {
         setReaders(r);
         setProfiles(p);
         setKeys(k);
       })
-      .catch((e) => setErr(String(e)));
+      .catch((e) => setErr(String(e)))
+      .finally(() => setBusy(false));
   }, []);
 
   if (err) {
@@ -33,6 +37,7 @@ export default function Dashboard() {
 
   return (
     <>
+      <LoadingOverlay show={busy} label="Loading overview…" />
       <h2>Overview</h2>
       <div className="row" style={{ gap: "1rem", alignItems: "stretch" }}>
         <StatCard label="Readers" value={readers.length} />

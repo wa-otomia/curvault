@@ -1,20 +1,24 @@
 import { useEffect, useState } from "react";
 import { listReaders, inspectCard } from "../lib/api";
 import type { Reader, CardInfo } from "../types";
+import LoadingOverlay from "../components/LoadingOverlay";
 
 export default function ReadersView() {
   const [readers, setReaders] = useState<Reader[]>([]);
   const [selected, setSelected] = useState<string | null>(null);
   const [card, setCard] = useState<CardInfo | null>(null);
-  const [busy, setBusy] = useState(false);
+  const [busy, setBusy] = useState(true);
   const [err, setErr] = useState<string | null>(null);
 
   const refresh = async () => {
+    setBusy(true);
     try {
       setReaders(await listReaders());
       setErr(null);
     } catch (e: unknown) {
       setErr(String(e));
+    } finally {
+      setBusy(false);
     }
   };
 
@@ -38,6 +42,7 @@ export default function ReadersView() {
 
   return (
     <>
+      <LoadingOverlay show={busy} label={selected ? "Inspecting card…" : "Listing readers…"} />
       <div className="row" style={{ justifyContent: "space-between" }}>
         <h2 style={{ margin: 0 }}>Readers</h2>
         <button onClick={refresh}>Refresh</button>

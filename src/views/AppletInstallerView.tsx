@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { open } from "@tauri-apps/plugin-dialog";
 import { listReaders, listGpKeys, installApplet, uninstallApplet } from "../lib/api";
 import type { Reader, GpKeyHandle, CommandResult } from "../types";
+import LoadingOverlay from "../components/LoadingOverlay";
 
 const ISOAPPLET_PKG = "F276A288BCFBA69D34F310";
 const ISOAPPLET_APP = "F276A288BCFBA69D34F31001";
@@ -72,6 +73,7 @@ export default function AppletInstallerView() {
 
   return (
     <>
+      <LoadingOverlay show={busy} label="Running gp…" />
       <h2>Applet Installer</h2>
 
       <div className="card">

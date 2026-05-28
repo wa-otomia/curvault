@@ -35,14 +35,51 @@
 
 body {
   margin: 0;
-  background: var(--bg);
+  /* When the window is transparent + has macOS sidebar vibrancy, this
+   * tint lets the desktop blur bleed through subtly while keeping text
+   * readable. Falls back to solid var(--bg) if the platform doesn't
+   * support vibrancy. */
+  background: rgba(6, 11, 26, 0.72);
   color: var(--text);
   font-feature-settings: "ss01", "cv11";
+}
+
+@supports not (backdrop-filter: blur(1px)) {
+  body { background: var(--bg); }
 }
 
 #root {
   height: 100vh;
   display: flex;
+  flex-direction: column;
+}
+
+.titlebar {
+  flex: 0 0 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  /* Reserve room on the left for macOS traffic lights (3 dots, ~74px wide). */
+  padding: 0 1rem 0 80px;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-mute);
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  background: transparent;
+  user-select: none;
+  -webkit-user-select: none;
+  border-bottom: 1px solid rgba(54, 197, 255, 0.06);
+}
+
+.titlebar .brand-mini {
+  opacity: 0.7;
+}
+
+.app-body {
+  flex: 1;
+  display: flex;
+  min-height: 0;
 }
 
 /* -------- buttons -------- */
@@ -69,14 +106,19 @@ button:disabled {
 }
 
 button.primary {
-  background: linear-gradient(135deg, var(--accent) 0%, var(--accent-2) 100%);
-  border-color: transparent;
-  color: white;
+  background: linear-gradient(180deg,
+    rgba(54, 197, 255, 0.18) 0%,
+    rgba(27, 79, 214, 0.28) 100%);
+  border-color: rgba(54, 197, 255, 0.45);
+  color: var(--text);
   font-weight: 600;
 }
 
 button.primary:hover {
-  filter: brightness(1.1);
+  background: linear-gradient(180deg,
+    rgba(54, 197, 255, 0.28) 0%,
+    rgba(27, 79, 214, 0.38) 100%);
+  border-color: var(--accent);
 }
 
 button.danger {
@@ -120,12 +162,14 @@ pre {
 
 .sidebar {
   width: 240px;
+  /* Lower the opacity on the base layer so the macOS sidebar vibrancy
+   * shows through; the gradients on top keep the brand colour. */
   background:
     radial-gradient(ellipse at 80% 5%, rgba(54,197,255,0.10) 0%, transparent 50%),
-    radial-gradient(ellipse at 10% 115%, rgba(27,79,214,0.20) 0%, transparent 55%),
-    var(--bg-elev);
+    radial-gradient(ellipse at 10% 115%, rgba(27,79,214,0.22) 0%, transparent 55%),
+    rgba(14, 21, 48, 0.55);
   position: relative;
-  border-right: 1px solid var(--border);
+  border-right: 1px solid rgba(54, 197, 255, 0.08);
   padding: 1rem 0.75rem 0;
   display: flex;
   flex-direction: column;
@@ -227,15 +271,18 @@ pre {
   display: flex;
   flex-direction: column;
   min-width: 0;
+  /* Slightly translucent so the desktop vibrancy underneath bleeds
+   * through. The gradient adds the brand-blue glow at the top-right. */
   background:
-    radial-gradient(ellipse at 80% 0%, rgba(54,197,255,0.06) 0%, transparent 55%),
-    var(--bg);
+    radial-gradient(ellipse at 80% 0%, rgba(54,197,255,0.08) 0%, transparent 55%),
+    rgba(6, 11, 26, 0.45);
 }
 
 .content {
   flex: 1;
   padding: 1.5rem 2rem;
   overflow: auto;
+  position: relative; /* anchor for .loading-overlay */
 }
 
 /* Consistent spacing for top-level page chrome.
@@ -258,8 +305,10 @@ pre {
 }
 
 .statusbar {
-  border-top: 1px solid var(--border);
-  background: var(--bg-elev);
+  border-top: 1px solid rgba(54, 197, 255, 0.08);
+  background: rgba(14, 21, 48, 0.55);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
   padding: 0.3rem 1rem;
   font-size: 12px;
   color: var(--text-dim);
@@ -284,12 +333,18 @@ pre {
 /* -------- cards & layout -------- */
 
 .card {
-  background: linear-gradient(180deg, var(--bg-elev) 0%, rgba(11,16,38,0.85) 100%);
+  /* Cards are content-bearing so they stay mostly opaque for
+   * readability, but we still allow a hint of vibrancy through. */
+  background: linear-gradient(180deg,
+    rgba(14, 21, 48, 0.85) 0%,
+    rgba(11, 16, 38, 0.78) 100%);
   border: 1px solid var(--border);
   border-radius: 10px;
   padding: 1rem 1.25rem;
   margin-bottom: 1rem;
   box-shadow: var(--shadow-card);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
 }
 
 .card h3 {
@@ -345,11 +400,90 @@ th {
   text-align: center;
 }
 
+/* -------- loading overlay -------- */
+
+.loading-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(6, 11, 26, 0.62);
+  -webkit-backdrop-filter: blur(3px);
+  backdrop-filter: blur(3px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  animation: curvault-fade-in 0.18s ease-out;
+}
+
+.loading-stack {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.9rem;
+}
+
+.loading-spinner {
+  filter: drop-shadow(0 0 14px rgba(54,197,255,0.35));
+}
+
+.loading-spinner .loading-ring-outer,
+.loading-spinner .loading-ring-inner,
+.loading-spinner .loading-dot {
+  /* SVG transform-origin needs box-coordinate; viewBox is 120x120 so
+   * percentages work after `transform-box: fill-box`. */
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+.loading-spinner .loading-ring-outer {
+  animation: curvault-spin 1.6s linear infinite;
+}
+
+.loading-spinner .loading-ring-inner {
+  animation: curvault-spin-reverse 1.0s linear infinite;
+}
+
+.loading-spinner .loading-dot {
+  animation: curvault-pulse 1.3s ease-in-out infinite;
+  transform-origin: 60px 60px;
+}
+
+.loading-label {
+  font-size: 13px;
+  color: var(--text);
+  letter-spacing: 0.3px;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.6);
+}
+
+@keyframes curvault-spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+@keyframes curvault-spin-reverse {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(-360deg); }
+}
+
+@keyframes curvault-pulse {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50%      { transform: scale(0.45); opacity: 0.45; }
+}
+
+@keyframes curvault-fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
 /* -------- log panel -------- */
 
 .logpanel {
-  border-top: 1px solid var(--border);
-  background: linear-gradient(180deg, var(--bg-elev) 0%, var(--bg) 100%);
+  border-top: 1px solid rgba(54, 197, 255, 0.08);
+  background: linear-gradient(180deg,
+    rgba(14, 21, 48, 0.55) 0%,
+    rgba(6, 11, 26, 0.55) 100%);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
   display: flex;
   flex-direction: column;
   transition: max-height 0.2s ease;
