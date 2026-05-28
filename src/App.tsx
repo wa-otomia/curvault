@@ -4,6 +4,7 @@ import StatusBar from "./components/StatusBar";
 import LogPanel from "./components/LogPanel";
 import Dashboard from "./views/Dashboard";
 import ReadersView from "./views/ReadersView";
+import AppletsView from "./views/AppletsView";
 import GpKeysView from "./views/GpKeysView";
 import AppletInstallerView from "./views/AppletInstallerView";
 import Pkcs15View from "./views/Pkcs15View";
@@ -24,6 +25,7 @@ export default function App() {
         <div className="content">
           {view === "dashboard" && <Dashboard />}
           {view === "readers" && <ReadersView />}
+          {view === "applets" && <AppletsView />}
           {view === "gp-keys" && <GpKeysView />}
           {view === "installer" && <AppletInstallerView />}
           {view === "pkcs15" && <Pkcs15View />}

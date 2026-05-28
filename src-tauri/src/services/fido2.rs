@@ -3,7 +3,7 @@
 //! Operations require a connected authenticator (USB or NFC reader holding
 //! a CTAP2 card). Listing credentials needs the PIN.
 
-use super::{emit_command_log, Result, ServiceError};
+use super::{emit_command_log, exec_tool, Result, ServiceError};
 use serde::{Deserialize, Serialize};
 use tokio::process::Command;
 
@@ -63,7 +63,7 @@ pub struct SetPinRequest {
 pub async fn list_devices() -> Result<Vec<Fido2Device>> {
     let started_at = chrono::Utc::now();
     let args = ["-L"];
-    let res = Command::new("fido2-token").args(args).output().await;
+    let res = exec_tool("fido2-token", &args).await;
 
     match &res {
         Ok(out) => emit_command_log(
@@ -165,7 +165,7 @@ mod tests {
 pub async fn info(path: &str) -> Result<Fido2Info> {
     let started_at = chrono::Utc::now();
     let args = ["-I", path];
-    let res = Command::new("fido2-token").args(args).output().await;
+    let res = exec_tool("fido2-token", &args).await;
 
     match &res {
         Ok(out) => emit_command_log(
@@ -237,40 +237,82 @@ fn parse_info(path: &str, text: &str) -> Fido2Info {
     }
 }
 
-/// List discoverable (resident) credentials. Requires PIN.
+/// List discoverable (resident) credentials. PIN is required by libfido2
+/// and is read from stdin — we write it ourselves so the call never hangs.
+///
+/// libfido2 splits the listing into two steps:
+///   1) `fido2-token -L -r <device>` -> list of RP IDs that have
+///      resident credentials. Output rows look like:
+///         00: 0xa1b2…  example.com
+///   2) `fido2-token -L -k <rp_id> <device>` -> credentials per RP. Rows:
+///         00: <cred_id_b64>: <user_id_b64>: <type>
+///
+/// Both calls prompt on stdin.
 pub async fn list_credentials(device_path: &str, pin: &str) -> Result<Vec<ResidentCredential>> {
-    // First enumerate RPs with `-L -r <device>`.
-    let rps_out = Command::new("fido2-token")
-        .args(["-L", "-r", device_path])
-        .stdin(std::process::Stdio::piped())
-        .stdout(std::process::Stdio::piped())
-        .spawn()?;
-    let _ = pin; // see note below: fido2-token prompts on stdin
-    let rps_done = rps_out.wait_with_output().await?;
-    let rps_text = String::from_utf8_lossy(&rps_done.stdout);
+    use tokio::io::AsyncWriteExt;
 
-    let mut creds = Vec::new();
-    for line in rps_text.lines() {
-        if let Some((idx, rp_id)) = line.split_once(':') {
-            let _ = idx;
-            let rp_id = rp_id.trim().to_string();
-            // For each RP, enumerate credentials with `-L -k <rp_id> <device>`
-            let out = Command::new("fido2-token")
-                .args(["-L", "-k", &rp_id, device_path])
-                .output()
-                .await?;
-            if !out.status.success() { continue; }
-            let txt = String::from_utf8_lossy(&out.stdout);
-            for cred_line in txt.lines() {
-                let parts: Vec<&str> = cred_line.split(':').collect();
-                if parts.len() < 2 { continue; }
-                creds.push(ResidentCredential {
-                    rp_id: rp_id.clone(),
-                    user_name: parts.get(2).map(|s| s.trim().to_string()),
-                    user_display_name: parts.get(3).map(|s| s.trim().to_string()),
-                    credential_id: parts.get(1).unwrap_or(&"").trim().to_string(),
-                });
+    async fn run_with_pin(args: &[&str], pin: &str) -> Result<(String, String, i32)> {
+        let started_at = chrono::Utc::now();
+        let mut child = Command::new("fido2-token")
+            .args(args)
+            .stdin(std::process::Stdio::piped())
+            .stdout(std::process::Stdio::piped())
+            .stderr(std::process::Stdio::piped())
+            .spawn()?;
+        if let Some(mut stdin) = child.stdin.take() {
+            stdin.write_all(pin.as_bytes()).await?;
+            stdin.write_all(b"\n").await?;
+        }
+        let out = child.wait_with_output().await?;
+        let stdout = String::from_utf8_lossy(&out.stdout).into_owned();
+        let stderr = String::from_utf8_lossy(&out.stderr).into_owned();
+        let code = out.status.code().unwrap_or(-1);
+        emit_command_log("fido2-token", args, started_at, code, &stdout, &stderr, None);
+        Ok((stdout, stderr, code))
+    }
+
+    // Step 1: list RPs.
+    let (rp_stdout, rp_stderr, rp_code) =
+        run_with_pin(&["-L", "-r", device_path], pin).await?;
+    if rp_code != 0 {
+        let msg = map_fido_error(&rp_stderr).unwrap_or(rp_stderr);
+        return Err(ServiceError::Command("fido2-token -L -r".into(), rp_code, msg));
+    }
+
+    let mut rps: Vec<String> = Vec::new();
+    for line in rp_stdout.lines() {
+        // Format: "<idx>: <hash>  <rp_id>"  — rp_id is the last whitespace-
+        // separated token. Skip empty / header lines.
+        let trimmed = line.trim();
+        if trimmed.is_empty() { continue; }
+        let last = trimmed.split_whitespace().last();
+        if let Some(rp) = last {
+            // Skip rows that don't look like RP rows (no dot in the rp_id).
+            if rp.contains('.') || rp.contains(':') || rp.contains('/') {
+                rps.push(rp.to_string());
             }
+        }
+    }
+
+    // Step 2: per-RP credential enumeration.
+    let mut creds = Vec::new();
+    for rp_id in rps {
+        let (out, _err, code) =
+            run_with_pin(&["-L", "-k", &rp_id, device_path], pin).await?;
+        if code != 0 { continue; }
+        for cred_line in out.lines() {
+            let trimmed = cred_line.trim();
+            if trimmed.is_empty() { continue; }
+            // Columns are colon-separated; layout (libfido2 1.13+):
+            //   <idx>: <user_id_b64>: <cred_id_b64>: <type>
+            let parts: Vec<&str> = trimmed.splitn(4, ':').map(|s| s.trim()).collect();
+            if parts.len() < 3 { continue; }
+            creds.push(ResidentCredential {
+                rp_id: rp_id.clone(),
+                user_name: parts.get(1).map(|s| s.to_string()).filter(|s| !s.is_empty()),
+                user_display_name: parts.get(3).map(|s| s.to_string()),
+                credential_id: parts.get(2).unwrap_or(&"").to_string(),
+            });
         }
     }
     Ok(creds)

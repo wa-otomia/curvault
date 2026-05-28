@@ -1,8 +1,7 @@
 //! Wrapper around the `gp` (GlobalPlatformPro) CLI.
 
-use super::{emit_command_log, Result, ServiceError};
+use super::{emit_command_log, exec_tool, Result, ServiceError};
 use serde::{Deserialize, Serialize};
-use tokio::process::Command;
 
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -47,10 +46,7 @@ async fn run_gp(reader: Option<&str>, key_hex: Option<&str>, args: &[&str]) -> R
     if let Some(k) = key_hex { full_args.push("-k"); full_args.push(k); }
     full_args.extend_from_slice(args);
 
-    let mut cmd = Command::new("gp");
-    cmd.args(&full_args);
-
-    let result = cmd.output().await;
+    let result = exec_tool("gp", &full_args).await;
 
     match &result {
         Ok(out) => emit_command_log(

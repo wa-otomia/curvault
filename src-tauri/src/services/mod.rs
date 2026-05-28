@@ -7,7 +7,8 @@ pub mod issuance;
 pub mod pkcs15;
 pub mod fido2;
 
-use std::sync::OnceLock;
+use std::collections::HashMap;
+use std::sync::{Mutex, OnceLock};
 use tauri::{AppHandle, Emitter};
 use thiserror::Error;
 
@@ -120,4 +121,92 @@ fn truncate(s: &str, max: usize) -> String {
         out.push_str("\n…(truncated)");
         out
     }
+}
+
+// ---------- Tool execution ----------
+//
+// Some tools (notably `gp`) are not installed as real binaries on the
+// user's PATH — they're shell aliases (`alias gp='java -jar gp.jar'`)
+// or functions defined in `.zshrc`. Our startup PATH-fixup catches
+// `/opt/homebrew/bin` etc. but it cannot pick up aliases or functions
+// — those only exist inside the shell process.
+//
+// exec_tool spawns the requested program directly first (fast path).
+// If that fails with NotFound, we fall back to the user's login shell,
+// force-source the usual rc files, and let the shell resolve the name.
+// We remember which tools needed the fallback so subsequent calls skip
+// the direct attempt.
+
+static SHELL_FALLBACK_CACHE: OnceLock<Mutex<HashMap<String, bool>>> = OnceLock::new();
+
+fn shell_fallback_cache() -> &'static Mutex<HashMap<String, bool>> {
+    SHELL_FALLBACK_CACHE.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
+fn shell_quote(s: &str) -> String {
+    if s.is_empty() {
+        return "''".to_string();
+    }
+    if s.chars().all(|c| c.is_ascii_alphanumeric() || "-_./@%+=:,".contains(c)) {
+        return s.to_string();
+    }
+    let mut out = String::with_capacity(s.len() + 2);
+    out.push('\'');
+    for c in s.chars() {
+        if c == '\'' { out.push_str("'\\''"); }
+        else { out.push(c); }
+    }
+    out.push('\'');
+    out
+}
+
+fn build_shell_script(tool: &str, args: &[&str]) -> (String, String) {
+    let shell = std::env::var("SHELL").unwrap_or_else(|_| "/bin/zsh".to_string());
+    let shell_name = std::path::Path::new(&shell)
+        .file_name()
+        .and_then(|s| s.to_str())
+        .unwrap_or("zsh");
+
+    let prelude = match shell_name {
+        "zsh" => r#"[ -f /etc/zshenv ] && . /etc/zshenv;[ -f "$HOME/.zshenv" ] && . "$HOME/.zshenv";[ -f /etc/zprofile ] && . /etc/zprofile;[ -f "$HOME/.zprofile" ] && . "$HOME/.zprofile";[ -f /etc/zshrc ] && . /etc/zshrc;[ -f "$HOME/.zshrc" ] && . "$HOME/.zshrc" 2>/dev/null;"#,
+        "bash" => r#"[ -f /etc/profile ] && . /etc/profile;[ -f "$HOME/.bash_profile" ] && . "$HOME/.bash_profile";[ -f "$HOME/.bashrc" ] && . "$HOME/.bashrc" 2>/dev/null;"#,
+        _ => "",
+    };
+
+    let mut inner = shell_quote(tool);
+    for arg in args {
+        inner.push(' ');
+        inner.push_str(&shell_quote(arg));
+    }
+
+    (shell, format!("{} {}", prelude, inner))
+}
+
+/// Run a tool, falling back to the user's login shell if direct spawn
+/// returns NotFound. Returns the same Output the caller would get from
+/// `Command::new(tool).args(args).output()`.
+pub async fn exec_tool(tool: &str, args: &[&str]) -> std::io::Result<std::process::Output> {
+    use tokio::process::Command;
+
+    let needs_shell = {
+        let m = shell_fallback_cache().lock().unwrap();
+        *m.get(tool).unwrap_or(&false)
+    };
+
+    if !needs_shell {
+        let direct = Command::new(tool).args(args).output().await;
+        match direct {
+            Ok(out) => return Ok(out),
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+                shell_fallback_cache()
+                    .lock()
+                    .unwrap()
+                    .insert(tool.to_string(), true);
+            }
+            Err(e) => return Err(e),
+        }
+    }
+
+    let (shell, script) = build_shell_script(tool, args);
+    Command::new(&shell).arg("-c").arg(&script).output().await
 }

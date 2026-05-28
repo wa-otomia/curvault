@@ -1,6 +1,7 @@
 export type View =
   | "dashboard"
   | "readers"
+  | "applets"
   | "gp-keys"
   | "installer"
   | "pkcs15"
@@ -11,9 +12,10 @@ export type View =
   | "issuance"
   | "sticker";
 
-const NAV: { id: View; label: string; group?: string }[] = [
+const NAV: { id: View; label: string }[] = [
   { id: "dashboard", label: "Dashboard" },
   { id: "readers",   label: "Readers" },
+  { id: "applets",   label: "Installed Applets" },
   { id: "gp-keys",   label: "GP Keys" },
   { id: "installer", label: "Applet Installer" },
   { id: "pkcs15",    label: "PKCS#15 Init" },
@@ -71,7 +73,6 @@ export default function Sidebar({
         ))}
       </div>
 
-      {/* Sticker-style wave decoration, anchored to bottom. */}
       <svg
         className="sidebar-waves"
         viewBox="0 0 100 100"

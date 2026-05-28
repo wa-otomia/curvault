@@ -1,8 +1,7 @@
 //! Wrappers around `opensc-tool`, `pkcs15-init`, `pkcs15-tool`.
 
-use super::{emit_command_log, Result, ServiceError};
+use super::{emit_command_log, exec_tool, Result, ServiceError};
 use serde::Serialize;
-use tokio::process::Command;
 
 #[derive(Debug, Serialize, Clone)]
 pub struct Reader {
@@ -16,7 +15,7 @@ pub struct Reader {
 pub async fn list_readers() -> Result<Vec<Reader>> {
     let started_at = chrono::Utc::now();
     let args = ["-l"];
-    let res = Command::new("opensc-tool").args(args).output().await;
+    let res = exec_tool("opensc-tool", &args).await;
 
     match &res {
         Ok(out) => emit_command_log(
@@ -110,7 +109,7 @@ fn parse_reader_list(text: &str) -> Vec<Reader> {
 pub async fn dump_pkcs15(reader: &str) -> Result<String> {
     let started_at = chrono::Utc::now();
     let args = ["--reader", reader, "--dump"];
-    let res = Command::new("pkcs15-tool").args(args).output().await;
+    let res = exec_tool("pkcs15-tool", &args).await;
 
     match &res {
         Ok(out) => emit_command_log(
@@ -173,7 +172,7 @@ pub async fn dump_pkcs11(module: Option<&str>) -> Result<String> {
 
     let started_at = chrono::Utc::now();
     let args = ["--module", &resolved, "--list-slots", "--list-objects"];
-    let res = Command::new("pkcs11-tool").args(args).output().await;
+    let res = exec_tool("pkcs11-tool", &args).await;
 
     match &res {
         Ok(out) => emit_command_log(
@@ -206,7 +205,7 @@ pub async fn dump_pkcs11(module: Option<&str>) -> Result<String> {
 pub async fn read_atr(reader: &str) -> Result<Option<String>> {
     let started_at = chrono::Utc::now();
     let args = ["-r", reader, "-an"];
-    let res = Command::new("opensc-tool").args(args).output().await;
+    let res = exec_tool("opensc-tool", &args).await;
 
     match &res {
         Ok(out) => emit_command_log(
