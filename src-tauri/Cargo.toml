@@ -1,0 +1,40 @@
+[package]
+name = "smartcard-issuer"
+version = "0.1.0"
+description = "Desktop card-issuance workstation for IsoApplet / JavaCard."
+authors = ["wa-otomia"]
+edition = "2021"
+rust-version = "1.75"
+
+[lib]
+name = "smartcard_issuer_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+tauri-plugin-dialog = "2"
+tauri-plugin-shell = "2"
+tauri-plugin-store = "2"
+
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "1"
+anyhow = "1"
+
+keyring = "3"
+chrono = { version = "0.4", features = ["serde"] }
+uuid = { version = "1", features = ["v4", "serde"] }
+rand = "0.8"
+hex = "0.4"
+regex = "1"
+tokio = { version = "1", features = ["process", "io-util", "macros", "sync"] }
+
+[profile.release]
+codegen-units = 1
+lto = true
+opt-level = "s"
+panic = "abort"
+strip = true

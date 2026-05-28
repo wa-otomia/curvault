@@ -1,0 +1,22 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "Capabilities granted to the main app window.",
+  "windows": ["main"],
+  "permissions": [
+    "core:default",
+    "dialog:default",
+    "store:default",
+    {
+      "identifier": "shell:allow-execute",
+      "allow": [
+        { "name": "gp",          "cmd": "gp",          "args": true, "sidecar": false },
+        { "name": "opensc-tool", "cmd": "opensc-tool", "args": true, "sidecar": false },
+        { "name": "pkcs15-init", "cmd": "pkcs15-init", "args": true, "sidecar": false },
+        { "name": "pkcs15-tool", "cmd": "pkcs15-tool", "args": true, "sidecar": false },
+        { "name": "pkcs11-tool", "cmd": "pkcs11-tool", "args": true, "sidecar": false },
+        { "name": "openssl",     "cmd": "openssl",     "args": true, "sidecar": false }
+      ]
+    }
+  ]
+}
