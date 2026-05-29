@@ -77,7 +77,10 @@ export default function Fido2View() {
   };
 
   const onListCreds = async () => {
-    if (!selected || !pin) return;
+    if (!selected) return;
+    // Empty PIN is allowed: the authenticator may have no clientPin set
+    // (the device info shows the `noclientPin` option). The backend will
+    // close stdin instead of feeding a blank PIN.
     setBusy(true);
     setErr(null);
     try {
@@ -90,7 +93,7 @@ export default function Fido2View() {
   };
 
   const onDeleteCred = async (cred: ResidentCredential) => {
-    if (!selected || !pin) return;
+    if (!selected) return;
     if (!confirm(`Delete credential for ${cred.rpId}? The user will lose passwordless login for that site.`)) return;
     setBusy(true);
     try {
@@ -245,18 +248,22 @@ export default function Fido2View() {
       {selected && (
         <div className="card">
           <h3>Resident credentials</h3>
-          <div className="row" style={{ marginBottom: "0.75rem" }}>
+          <div className="row" style={{ marginBottom: "0.5rem" }}>
             <input
               type="password"
-              placeholder="Device PIN"
+              placeholder="Device PIN (leave empty if the device has no PIN)"
               value={pin}
               onChange={(e) => setPin(e.target.value)}
               style={{ flex: 1 }}
             />
-            <button onClick={onListCreds} disabled={!pin || busy}>List credentials</button>
+            <button onClick={onListCreds} disabled={busy}>List credentials</button>
           </div>
+          <small style={{ color: "var(--text-dim)", fontSize: 11, marginBottom: "0.75rem", display: "block" }}>
+            This authenticator reports <code>noclientPin</code> when no PIN is set — leave
+            the field blank and it will enumerate without PIN auth.
+          </small>
           {creds === null ? (
-            <div className="empty">Enter the PIN and click "List credentials".</div>
+            <div className="empty">Click "List credentials" (enter the PIN first if the device has one).</div>
           ) : creds.length === 0 ? (
             <div className="empty">No resident credentials on this device.</div>
           ) : (

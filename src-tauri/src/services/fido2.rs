@@ -260,8 +260,15 @@ pub async fn list_credentials(device_path: &str, pin: &str) -> Result<Vec<Reside
             .stderr(std::process::Stdio::piped())
             .spawn()?;
         if let Some(mut stdin) = child.stdin.take() {
-            stdin.write_all(pin.as_bytes()).await?;
-            stdin.write_all(b"\n").await?;
+            // Empty PIN -> the authenticator has no clientPin set. Don't
+            // feed a blank line (fido2-token would treat it as a wrong
+            // PIN); just close stdin so the tool proceeds without PIN
+            // auth and enumerates directly.
+            if !pin.is_empty() {
+                stdin.write_all(pin.as_bytes()).await?;
+                stdin.write_all(b"\n").await?;
+            }
+            // stdin dropped here -> EOF.
         }
         let out = child.wait_with_output().await?;
         let stdout = String::from_utf8_lossy(&out.stdout).into_owned();
