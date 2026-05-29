@@ -27,6 +27,12 @@ pub async fn list_readers() -> Result<Vec<opensc::Reader>> {
     Ok(readers)
 }
 
+/// Reader + card-presence counts only — no ATR reads, no command-log
+/// entries. Backs the status bar's lightweight poll.
+pub async fn list_readers_quiet() -> Result<Vec<opensc::Reader>> {
+    opensc::list_readers_quiet().await
+}
+
 pub async fn inspect(reader: &str) -> Result<CardInfo> {
     let atr = opensc::read_atr(reader).await?.unwrap_or_else(|| "-".into());
     // Try GP info with default test key. If it fails (rotated key), caller

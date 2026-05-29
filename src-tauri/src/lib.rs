@@ -135,6 +135,7 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             commands::list_readers,
+            commands::list_readers_quiet,
             commands::inspect_card,
             commands::list_gp_keys,
             commands::generate_gp_key,

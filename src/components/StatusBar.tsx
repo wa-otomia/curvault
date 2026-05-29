@@ -1,23 +1,36 @@
 import { useEffect, useState } from "react";
-import { listReaders } from "../lib/api";
+import { listReadersQuiet } from "../lib/api";
 
-// Refresh policy: one-shot on mount. Polling every few seconds floods the
-// command log with noise and rarely surfaces a real state change — readers
-// don't appear / disappear that often. The Readers view has its own
-// explicit Refresh button for when the user actually wants to recheck.
+// The status bar polls every few seconds so the reader / card counts
+// stay in sync with what's physically plugged in. It uses the *quiet*
+// reader listing, which skips ATR reads and does NOT emit command-log
+// entries — so the poll never floods the bottom panel.
+const POLL_MS = 3000;
+
 export default function StatusBar() {
   const [readerCount, setReaderCount] = useState<number | null>(null);
   const [cardCount, setCardCount] = useState<number | null>(null);
   const [err, setErr] = useState<string | null>(null);
 
   useEffect(() => {
-    listReaders()
-      .then((readers) => {
+    let alive = true;
+    const refresh = async () => {
+      try {
+        const readers = await listReadersQuiet();
+        if (!alive) return;
         setReaderCount(readers.length);
         setCardCount(readers.filter((r) => r.hasCard).length);
         setErr(null);
-      })
-      .catch((e: unknown) => setErr(String(e)));
+      } catch (e: unknown) {
+        if (alive) setErr(String(e));
+      }
+    };
+    refresh();
+    const t = setInterval(refresh, POLL_MS);
+    return () => {
+      alive = false;
+      clearInterval(t);
+    };
   }, []);
 
   return (
@@ -36,7 +49,7 @@ export default function StatusBar() {
           </>
         )}
       </span>
-      <span>Curvault · v0.1.16</span>
+      <span>Curvault · v0.1.17</span>
     </div>
   );
 }

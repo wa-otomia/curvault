@@ -46,7 +46,7 @@ body {
    * .card overlays it. Sidebar and main-frame add only brand-coloured
    * gradients on top — no extra solid fills — so the chrome reads as
    * a uniform 90 % tint with the desktop blur subtly bleeding through. */
-  background: rgba(6, 11, 26, 0.90);
+  background: rgba(6, 11, 26, 0.80);
   color: var(--text);
   font-feature-settings: "ss01", "cv11";
 }

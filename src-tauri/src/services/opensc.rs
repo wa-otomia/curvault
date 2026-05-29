@@ -12,22 +12,36 @@ pub struct Reader {
 }
 
 /// `opensc-tool -l` -> list of readers with card presence + ATR.
+/// Emits a command-log entry.
 pub async fn list_readers() -> Result<Vec<Reader>> {
+    list_readers_inner(true).await
+}
+
+/// Same listing but WITHOUT emitting a command-log entry. Used by the
+/// status bar's periodic poll so the bottom-of-window card count stays
+/// fresh without flooding the command log every few seconds.
+pub async fn list_readers_quiet() -> Result<Vec<Reader>> {
+    list_readers_inner(false).await
+}
+
+async fn list_readers_inner(log: bool) -> Result<Vec<Reader>> {
     let started_at = chrono::Utc::now();
     let args = ["-l"];
     let res = exec_tool("opensc-tool", &args).await;
 
-    match &res {
-        Ok(out) => emit_command_log(
-            "opensc-tool", &args, started_at,
-            out.status.code().unwrap_or(-1),
-            &String::from_utf8_lossy(&out.stdout),
-            &String::from_utf8_lossy(&out.stderr),
-            None,
-        ),
-        Err(e) => emit_command_log(
-            "opensc-tool", &args, started_at, -1, "", "", Some(&e.to_string()),
-        ),
+    if log {
+        match &res {
+            Ok(out) => emit_command_log(
+                "opensc-tool", &args, started_at,
+                out.status.code().unwrap_or(-1),
+                &String::from_utf8_lossy(&out.stdout),
+                &String::from_utf8_lossy(&out.stderr),
+                None,
+            ),
+            Err(e) => emit_command_log(
+                "opensc-tool", &args, started_at, -1, "", "", Some(&e.to_string()),
+            ),
+        }
     }
 
     let out = res.map_err(|e| if e.kind() == std::io::ErrorKind::NotFound {

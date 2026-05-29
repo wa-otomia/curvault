@@ -13,6 +13,11 @@ pub async fn list_readers() -> Result<Vec<opensc::Reader>> {
 }
 
 #[tauri::command]
+pub async fn list_readers_quiet() -> Result<Vec<opensc::Reader>> {
+    pcsc::list_readers_quiet().await
+}
+
+#[tauri::command]
 pub async fn inspect_card(reader: String) -> Result<pcsc::CardInfo> {
     pcsc::inspect(&reader).await
 }

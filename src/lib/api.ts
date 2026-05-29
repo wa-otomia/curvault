@@ -22,6 +22,11 @@ import type {
 // ---------- Readers / Card ----------
 
 export const listReaders = (): Promise<Reader[]> => invoke("list_readers");
+
+/** Reader/card counts without ATR reads or command-log noise — for the
+ *  status bar's periodic poll. */
+export const listReadersQuiet = (): Promise<Reader[]> => invoke("list_readers_quiet");
+
 export const inspectCard = (reader: string): Promise<CardInfo> =>
   invoke("inspect_card", { reader });
 
