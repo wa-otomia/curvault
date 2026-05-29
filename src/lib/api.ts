@@ -125,6 +125,11 @@ export const checkForUpdates = (): Promise<UpdateInfo> =>
 export const openUpdaterWindow = (): Promise<void> =>
   invoke("open_updater_window");
 
+/** Whether native PC/SC event monitoring is active (frontend then reacts to
+ *  `pcsc://changed` events instead of polling). */
+export const pcscEventDriven = (): Promise<boolean> =>
+  invoke("pcsc_event_driven");
+
 // ---------- Events ----------
 
 export interface CommandLogEntry {

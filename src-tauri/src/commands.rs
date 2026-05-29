@@ -188,3 +188,10 @@ pub async fn check_for_updates() -> Result<updates::UpdateInfo> {
 pub fn open_updater_window(app: tauri::AppHandle) {
     crate::open_updater(&app);
 }
+
+/// Whether the native PC/SC event monitor is running. When true the frontend
+/// reacts to `pcsc://changed` events instead of polling.
+#[tauri::command]
+pub fn pcsc_event_driven() -> bool {
+    crate::services::cardmon::is_active()
+}

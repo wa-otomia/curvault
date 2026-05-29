@@ -214,6 +214,9 @@ pub fn run() {
         })
         .setup(|app| {
             services::install_app_handle(app.handle().clone());
+            // Event-driven reader/card monitoring (falls back to polling if
+            // PC/SC is unavailable).
+            services::cardmon::start(app.handle().clone());
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -241,6 +244,7 @@ pub fn run() {
             commands::run_issuance,
             commands::check_for_updates,
             commands::open_updater_window,
+            commands::pcsc_event_driven,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

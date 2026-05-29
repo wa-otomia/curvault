@@ -1,3 +1,4 @@
+pub mod cardmon;
 pub mod gp;
 pub mod opensc;
 pub mod pcsc;

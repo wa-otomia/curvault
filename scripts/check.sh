@@ -17,7 +17,7 @@ docker run --rm -v "$PWD:/work" -w /work/src-tauri rust:bookworm bash -c '
     apt-get update -qq
     DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
         pkg-config libgtk-3-dev libwebkit2gtk-4.1-dev librsvg2-dev libsoup-3.0-dev \
-        libayatana-appindicator3-dev libsecret-1-dev patchelf > /dev/null
+        libayatana-appindicator3-dev libsecret-1-dev libpcsclite-dev patchelf > /dev/null
     cargo check --all-targets
 '
 
