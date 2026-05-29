@@ -55,6 +55,12 @@ pub async fn create(req: Pkcs15InitRequest) -> Result<Pkcs15InitResult> {
     let creds_id = stash_credentials(&req)?;
 
     // 3) pkcs15-init --create-pkcs15
+    //
+    // Even with --so-pin on the command line, pkcs15-init still prompts for
+    // the optional SO-PUK ("Unblock Code … press return for no PIN"). With no
+    // stdin attached that read fails with "Failed to read PIN: Internal
+    // error", so we attach a pipe and send a blank line = "no SO-PUK"
+    // (matching the documented IsoApplet flow of pressing Enter).
     let create_args: Vec<&str> = vec![
         "-r", &req.reader,
         "--create-pkcs15",
@@ -63,11 +69,7 @@ pub async fn create(req: Pkcs15InitRequest) -> Result<Pkcs15InitResult> {
         "--serial", &req.serial,
     ];
     let started_at = chrono::Utc::now();
-    let mut create = Command::new("pkcs15-init");
-    if let Some(dir) = profile_dir.as_ref() {
-        create.env("OPENSC_PROFILE_DIR", dir);
-    }
-    let out = create.args(&create_args).output().await.map_err(map_io("pkcs15-init"))?;
+    let out = run_init(&create_args, profile_dir.as_deref(), b"\n").await?;
     emit_command_log(
         "pkcs15-init", &create_args, started_at,
         out.status.code().unwrap_or(-1),
@@ -84,6 +86,10 @@ pub async fn create(req: Pkcs15InitRequest) -> Result<Pkcs15InitResult> {
     }
 
     // 4) pkcs15-init --store-pin  (user PIN against auth-id 01)
+    //
+    // Creating the PIN object authenticates as the security officer set
+    // above. We pass --so-pin so it doesn't prompt, and still feed a blank
+    // line on stdin as a safety net for any residual optional prompt.
     let store_args: Vec<&str> = vec![
         "-r", &req.reader,
         "--store-pin",
@@ -91,13 +97,10 @@ pub async fn create(req: Pkcs15InitRequest) -> Result<Pkcs15InitResult> {
         "--label", "User PIN",
         "--pin", &req.pin,
         "--puk", &req.puk,
+        "--so-pin", &req.puk,
     ];
     let started_at2 = chrono::Utc::now();
-    let mut store = Command::new("pkcs15-init");
-    if let Some(dir) = profile_dir.as_ref() {
-        store.env("OPENSC_PROFILE_DIR", dir);
-    }
-    let out2 = store.args(&store_args).output().await.map_err(map_io("pkcs15-init"))?;
+    let out2 = run_init(&store_args, profile_dir.as_deref(), b"\n").await?;
     emit_command_log(
         "pkcs15-init", &store_args, started_at2,
         out2.status.code().unwrap_or(-1),
@@ -120,6 +123,33 @@ pub async fn create(req: Pkcs15InitRequest) -> Result<Pkcs15InitResult> {
         exit_code: exit,
         credentials_vault_id: creds_id,
     })
+}
+
+/// Run `pkcs15-init` with a piped stdin so interactive PIN prompts can be
+/// answered (pkcs15-init prompts for any secret not fully covered by flags,
+/// and reading from a missing stdin fails with "Internal error"). `stdin_data`
+/// is written then the pipe is closed (EOF), which also satisfies
+/// "press return for no PIN" style optional prompts.
+async fn run_init(
+    args: &[&str],
+    profile_dir: Option<&std::path::Path>,
+    stdin_data: &[u8],
+) -> Result<std::process::Output> {
+    use tokio::io::AsyncWriteExt;
+    let mut cmd = Command::new("pkcs15-init");
+    if let Some(dir) = profile_dir {
+        cmd.env("OPENSC_PROFILE_DIR", dir);
+    }
+    cmd.args(args)
+        .stdin(std::process::Stdio::piped())
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped());
+    let mut child = cmd.spawn().map_err(map_io("pkcs15-init"))?;
+    if let Some(mut stdin) = child.stdin.take() {
+        let _ = stdin.write_all(stdin_data).await;
+        // stdin dropped here -> EOF, so blocking reads don't hang.
+    }
+    child.wait_with_output().await.map_err(map_io("pkcs15-init"))
 }
 
 fn validate_lengths(req: &Pkcs15InitRequest) -> Result<()> {
