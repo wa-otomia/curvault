@@ -93,12 +93,25 @@ export default function AppletInstallerView() {
           <label>GP key</label>
           <select value={gpKeyId} onChange={(e) => setGpKeyId(e.target.value)}>
             <option value="">Default test key (40 41 42 … 4F)</option>
-            {keys.map((k) => (
-              <option key={k.id} value={k.id}>
-                {k.id} {k.cardSerial ? `(${k.cardSerial})` : ""}
-              </option>
-            ))}
+            {keys.map((k) => {
+              // Build a readable label that surfaces the user-supplied note,
+              // the card serial it was generated against, and the vault id.
+              const parts: string[] = [];
+              if (k.note) parts.push(k.note);
+              parts.push(k.id);
+              if (k.cardSerial) parts.push(`card ${k.cardSerial}`);
+              return (
+                <option key={k.id} value={k.id} title={k.note ?? ""}>
+                  {parts.join(" · ")}
+                </option>
+              );
+            })}
           </select>
+          {gpKeyId && keys.find((k) => k.id === gpKeyId)?.note && (
+            <small style={{ color: "var(--text-dim)", fontSize: 11, marginTop: 2 }}>
+              Note: {keys.find((k) => k.id === gpKeyId)?.note}
+            </small>
+          )}
         </div>
 
         <div className="field">
