@@ -1,4 +1,6 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { listen } from "@tauri-apps/api/event";
+import { exit } from "@tauri-apps/plugin-process";
 import Sidebar, { type View } from "./components/Sidebar";
 import StatusBar from "./components/StatusBar";
 import LogPanel from "./components/LogPanel";
@@ -25,6 +27,16 @@ export default function App() {
     if (v === "about") openAboutWindow().catch(() => {});
     else setView(v);
   };
+
+  // The main window's close is held in Rust; play the same dismiss animation
+  // on the whole app, then exit.
+  useEffect(() => {
+    const unlisten = listen("app://close", () => {
+      document.getElementById("root")?.classList.add("app-closing");
+      setTimeout(() => { exit(0).catch(() => {}); }, 300);
+    });
+    return () => { unlisten.then((f) => f()); };
+  }, []);
 
   return (
     <>

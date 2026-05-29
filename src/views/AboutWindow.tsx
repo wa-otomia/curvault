@@ -34,7 +34,7 @@ export default function AboutWindow() {
       <BrandBackdrop opacity={0.5} />
 
       <div className="updater-content" {...DRAG}>
-        <div {...DRAG}><BrandLogo size={104} /></div>
+        <div {...DRAG}><BrandLogo size={84} /></div>
         <h1 className="updater-title" {...DRAG}>Curvault</h1>
         <p className="updater-sub" {...DRAG} style={{ maxWidth: 320 }}>
           Desktop card-issuance workstation for IsoApplet / JavaCard / FIDO2.

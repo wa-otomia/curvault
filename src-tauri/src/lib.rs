@@ -152,9 +152,9 @@ pub(crate) fn open_updater<R: tauri::Runtime>(app: &tauri::AppHandle<R>) {
     open_popup(app, "updater", "Software Update", 460.0, 560.0);
 }
 
-/// The standalone About window.
+/// The standalone About window (kept short / flat).
 pub(crate) fn open_about<R: tauri::Runtime>(app: &tauri::AppHandle<R>) {
-    open_popup(app, "about", "About Curvault", 440.0, 560.0);
+    open_popup(app, "about", "About Curvault", 470.0, 440.0);
 }
 
 /// Build the application menu: a custom About + Check-for-Updates pair plus
@@ -221,6 +221,18 @@ pub fn run() {
                 "about" => open_about(app),
                 "check-update" => open_updater(app),
                 _ => {}
+            }
+        })
+        .on_window_event(|window, event| {
+            use tauri::{Emitter, WindowEvent};
+            // Let the main window play a dismiss animation before it actually
+            // closes: hold the close, tell the frontend, which exits once the
+            // animation finishes. Popups are frameless and close themselves.
+            if let WindowEvent::CloseRequested { api, .. } = event {
+                if window.label() == "main" {
+                    api.prevent_close();
+                    let _ = window.emit("app://close", ());
+                }
             }
         })
         .setup(|app| {

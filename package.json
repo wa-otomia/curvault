@@ -1,6 +1,6 @@
 {
   "name": "curvault",
-  "version": "0.1.31",
+  "version": "0.1.32",
   "private": true,
   "type": "module",
   "description": "Curvault — desktop card-issuance workstation for IsoApplet / JavaCard / FIDO2.",
