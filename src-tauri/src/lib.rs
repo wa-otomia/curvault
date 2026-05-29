@@ -152,9 +152,10 @@ pub(crate) fn open_updater<R: tauri::Runtime>(app: &tauri::AppHandle<R>) {
     open_popup(app, "updater", "Software Update", 460.0, 560.0);
 }
 
-/// The standalone About window (kept short / flat).
+/// The standalone About window — wide and flat so the tagline / meta line
+/// don't wrap.
 pub(crate) fn open_about<R: tauri::Runtime>(app: &tauri::AppHandle<R>) {
-    open_popup(app, "about", "About Curvault", 470.0, 440.0);
+    open_popup(app, "about", "About Curvault", 520.0, 430.0);
 }
 
 /// Build the application menu: a custom About + Check-for-Updates pair plus

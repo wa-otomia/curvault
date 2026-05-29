@@ -33,10 +33,10 @@ export default function AboutWindow() {
     <div className={`updater-root${closing ? " closing" : ""}`} {...DRAG}>
       <BrandBackdrop opacity={0.5} />
 
-      <div className="updater-content" {...DRAG}>
+      <div className="updater-content about-content" {...DRAG}>
         <div {...DRAG}><BrandLogo size={84} /></div>
         <h1 className="updater-title" {...DRAG}>Curvault</h1>
-        <p className="updater-sub" {...DRAG} style={{ maxWidth: 320 }}>
+        <p className="updater-sub" {...DRAG} style={{ maxWidth: 460 }}>
           Desktop card-issuance workstation for IsoApplet / JavaCard / FIDO2.
         </p>
 

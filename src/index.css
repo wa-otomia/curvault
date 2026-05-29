@@ -705,15 +705,20 @@ th {
   font-size: 11px;
 }
 
+/* The About window is wider than the updater, so its content column is too —
+ * keeps the tagline and meta line from wrapping. */
+.about-content { max-width: 460px; }
+
 .about-meta {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   justify-content: center;
   gap: 1.1rem;
   margin: 0.5rem 0 0.2rem;
   font-size: 13px;
   color: var(--text-dim);
 }
+.about-meta span { white-space: nowrap; }
 .about-meta b { color: var(--text); font-weight: 600; }
 
 .updater-actions {
