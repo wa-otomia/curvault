@@ -35,16 +35,18 @@
 
 body {
   margin: 0;
-  /* When the window is transparent + has macOS sidebar vibrancy, this
-   * tint lets the desktop blur bleed through subtly while keeping text
-   * readable. Falls back to solid var(--bg) if the platform doesn't
-   * support vibrancy. */
-  background: rgba(6, 11, 26, 0.72);
+  /* The window is configured with transparent:true + macOS vibrancy,
+   * so the body MUST stay fully transparent for the blurred desktop
+   * underneath to show. Tints live on the inner panels instead. */
+  background: transparent;
   color: var(--text);
   font-feature-settings: "ss01", "cv11";
 }
 
 @supports not (backdrop-filter: blur(1px)) {
+  /* Platforms without backdrop-filter (older Linux desktops, some
+   * Windows revisions) lose vibrancy entirely — fall back to a solid
+   * fill so contrast survives. */
   body { background: var(--bg); }
 }
 
@@ -162,14 +164,13 @@ pre {
 
 .sidebar {
   width: 240px;
-  /* Lower the opacity on the base layer so the macOS sidebar vibrancy
-   * shows through; the gradients on top keep the brand colour. */
+  /* Translucent brand-blue tint over vibrancy. */
   background:
     radial-gradient(ellipse at 80% 5%, rgba(54,197,255,0.10) 0%, transparent 50%),
-    radial-gradient(ellipse at 10% 115%, rgba(27,79,214,0.22) 0%, transparent 55%),
-    rgba(14, 21, 48, 0.55);
+    radial-gradient(ellipse at 10% 115%, rgba(27,79,214,0.25) 0%, transparent 55%),
+    rgba(14, 21, 48, 0.25);
   position: relative;
-  border-right: 1px solid rgba(54, 197, 255, 0.08);
+  border-right: 1px solid rgba(54, 197, 255, 0.10);
   padding: 1rem 0.75rem 0;
   display: flex;
   flex-direction: column;
@@ -271,11 +272,10 @@ pre {
   display: flex;
   flex-direction: column;
   min-width: 0;
-  /* Slightly translucent so the desktop vibrancy underneath bleeds
-   * through. The gradient adds the brand-blue glow at the top-right. */
+  /* Just a subtle brand-blue glow — no solid tint, so the macOS
+   * vibrancy reads through clearly. */
   background:
-    radial-gradient(ellipse at 80% 0%, rgba(54,197,255,0.08) 0%, transparent 55%),
-    rgba(6, 11, 26, 0.45);
+    radial-gradient(ellipse at 80% 0%, rgba(54,197,255,0.10) 0%, transparent 55%);
 }
 
 .content {
@@ -429,10 +429,12 @@ th {
 .loading-spinner .loading-ring-outer,
 .loading-spinner .loading-ring-inner,
 .loading-spinner .loading-dot {
-  /* SVG transform-origin needs box-coordinate; viewBox is 120x120 so
-   * percentages work after `transform-box: fill-box`. */
-  transform-box: fill-box;
-  transform-origin: center;
+  /* Anchor the rotation to the centre of the SVG viewport (viewBox is
+   * 0 0 120 120, so 50% = 60 user units). fill-box would pin to each
+   * path's own bounding box centre, which for the open-C arcs is off
+   * canvas — the rings then orbit instead of spinning. */
+  transform-box: view-box;
+  transform-origin: 50% 50%;
 }
 
 .loading-spinner .loading-ring-outer {
@@ -445,7 +447,6 @@ th {
 
 .loading-spinner .loading-dot {
   animation: curvault-pulse 1.3s ease-in-out infinite;
-  transform-origin: 60px 60px;
 }
 
 .loading-label {
