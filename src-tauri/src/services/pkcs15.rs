@@ -5,7 +5,7 @@
 //! pkcs15-init's command line, so we synthesise a profile file on the fly
 //! and point OpenSC at it via OPENSC_PROFILE_DIR.
 
-use super::{Result, ServiceError};
+use super::{emit_command_log, Result, ServiceError};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use std::fs;
@@ -55,18 +55,26 @@ pub async fn create(req: Pkcs15InitRequest) -> Result<Pkcs15InitResult> {
     let creds_id = stash_credentials(&req)?;
 
     // 3) pkcs15-init --create-pkcs15
-    let mut create = Command::new("pkcs15-init");
-    if let Some(dir) = profile_dir.as_ref() {
-        create.env("OPENSC_PROFILE_DIR", dir);
-    }
-    create.args([
+    let create_args: Vec<&str> = vec![
         "-r", &req.reader,
         "--create-pkcs15",
         "--so-pin", &req.puk,        // IsoApplet conflates SO-PIN with PUK
         "--label", &req.label,
         "--serial", &req.serial,
-    ]);
-    let out = create.output().await.map_err(map_io("pkcs15-init"))?;
+    ];
+    let started_at = chrono::Utc::now();
+    let mut create = Command::new("pkcs15-init");
+    if let Some(dir) = profile_dir.as_ref() {
+        create.env("OPENSC_PROFILE_DIR", dir);
+    }
+    let out = create.args(&create_args).output().await.map_err(map_io("pkcs15-init"))?;
+    emit_command_log(
+        "pkcs15-init", &create_args, started_at,
+        out.status.code().unwrap_or(-1),
+        &String::from_utf8_lossy(&out.stdout),
+        &String::from_utf8_lossy(&out.stderr),
+        None,
+    );
     if !out.status.success() {
         return Err(ServiceError::Command(
             "pkcs15-init --create-pkcs15".into(),
@@ -76,19 +84,27 @@ pub async fn create(req: Pkcs15InitRequest) -> Result<Pkcs15InitResult> {
     }
 
     // 4) pkcs15-init --store-pin  (user PIN against auth-id 01)
-    let mut store = Command::new("pkcs15-init");
-    if let Some(dir) = profile_dir.as_ref() {
-        store.env("OPENSC_PROFILE_DIR", dir);
-    }
-    store.args([
+    let store_args: Vec<&str> = vec![
         "-r", &req.reader,
         "--store-pin",
         "--auth-id", "01",
         "--label", "User PIN",
         "--pin", &req.pin,
         "--puk", &req.puk,
-    ]);
-    let out2 = store.output().await.map_err(map_io("pkcs15-init"))?;
+    ];
+    let started_at2 = chrono::Utc::now();
+    let mut store = Command::new("pkcs15-init");
+    if let Some(dir) = profile_dir.as_ref() {
+        store.env("OPENSC_PROFILE_DIR", dir);
+    }
+    let out2 = store.args(&store_args).output().await.map_err(map_io("pkcs15-init"))?;
+    emit_command_log(
+        "pkcs15-init", &store_args, started_at2,
+        out2.status.code().unwrap_or(-1),
+        &String::from_utf8_lossy(&out2.stdout),
+        &String::from_utf8_lossy(&out2.stderr),
+        None,
+    );
     let exit = out2.status.code().unwrap_or(-1);
     Ok(Pkcs15InitResult {
         stdout: format!(

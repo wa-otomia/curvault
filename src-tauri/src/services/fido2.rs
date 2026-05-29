@@ -386,38 +386,45 @@ mod credential_parser_tests {
 /// `fido2-token -D -i <cred_id> <device>` (PIN provided via env var so it
 /// stays off argv).
 pub async fn delete_credential(req: DeleteCredentialRequest) -> Result<()> {
+    use tokio::io::AsyncWriteExt;
+    let started_at = chrono::Utc::now();
+    let args = ["-D", "-i", &req.credential_id[..], &req.device_path[..]];
+
     let mut out = Command::new("fido2-token")
-        .args(["-D", "-i", &req.credential_id, &req.device_path])
+        .args(args)
         .env("FIDO_DEVTIMEOUT", "10")
-        // PIN is read from stdin by fido2-token when -p not given. We write it.
         .stdin(std::process::Stdio::piped())
         .stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::piped())
         .spawn()?;
-    use tokio::io::AsyncWriteExt;
     if let Some(mut stdin) = out.stdin.take() {
         stdin.write_all(req.pin.as_bytes()).await?;
         stdin.write_all(b"\n").await?;
-        // stdin dropped here closes the pipe, signalling EOF to the child.
     }
     let result = out.wait_with_output().await?;
+
+    let stdout = String::from_utf8_lossy(&result.stdout).into_owned();
+    let stderr = String::from_utf8_lossy(&result.stderr).into_owned();
+    let code = result.status.code().unwrap_or(-1);
+    emit_command_log("fido2-token", &args, started_at, code, &stdout, &stderr, None);
+
     if !result.status.success() {
-        return Err(ServiceError::Command(
-            "fido2-token -D".into(),
-            result.status.code().unwrap_or(-1),
-            String::from_utf8_lossy(&result.stderr).into_owned(),
-        ));
+        return Err(ServiceError::Command("fido2-token -D".into(), code, stderr));
     }
     Ok(())
 }
 
 /// Set or change the FIDO2 PIN.
 pub async fn set_pin(req: SetPinRequest) -> Result<()> {
-    let mut args = vec!["-S".to_string()];
+    use tokio::io::AsyncWriteExt;
+    let started_at = chrono::Utc::now();
+
+    let mut args: Vec<String> = vec!["-S".into()];
     if req.old_pin.is_some() {
-        args.push("-c".to_string());
+        args.push("-c".into());
     }
     args.push(req.device_path.clone());
+    let args_ref: Vec<&str> = args.iter().map(String::as_str).collect();
 
     let mut cmd = Command::new("fido2-token");
     cmd.args(&args)
@@ -425,7 +432,6 @@ pub async fn set_pin(req: SetPinRequest) -> Result<()> {
         .stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::piped());
     let mut child = cmd.spawn()?;
-    use tokio::io::AsyncWriteExt;
     if let Some(mut stdin) = child.stdin.take() {
         if let Some(old) = &req.old_pin {
             stdin.write_all(old.as_bytes()).await?;
@@ -437,22 +443,38 @@ pub async fn set_pin(req: SetPinRequest) -> Result<()> {
         stdin.write_all(b"\n").await?;
     }
     let result = child.wait_with_output().await?;
+
+    let stdout = String::from_utf8_lossy(&result.stdout).into_owned();
+    let stderr = String::from_utf8_lossy(&result.stderr).into_owned();
+    let code = result.status.code().unwrap_or(-1);
+    emit_command_log("fido2-token", &args_ref, started_at, code, &stdout, &stderr, None);
+
     if !result.status.success() {
-        return Err(ServiceError::Command(
-            "fido2-token -S".into(),
-            result.status.code().unwrap_or(-1),
-            String::from_utf8_lossy(&result.stderr).into_owned(),
-        ));
+        return Err(ServiceError::Command("fido2-token -S".into(), code, stderr));
     }
     Ok(())
 }
 
 /// Factory reset (within 10s of plugging in / waking the authenticator).
 pub async fn reset(device_path: &str) -> Result<()> {
-    let out = Command::new("fido2-token")
-        .args(["-R", device_path])
-        .output()
-        .await?;
+    let started_at = chrono::Utc::now();
+    let args = ["-R", device_path];
+    let res = exec_tool("fido2-token", &args).await;
+
+    match &res {
+        Ok(out) => emit_command_log(
+            "fido2-token", &args, started_at,
+            out.status.code().unwrap_or(-1),
+            &String::from_utf8_lossy(&out.stdout),
+            &String::from_utf8_lossy(&out.stderr),
+            None,
+        ),
+        Err(e) => emit_command_log(
+            "fido2-token", &args, started_at, -1, "", "", Some(&e.to_string()),
+        ),
+    }
+
+    let out = res?;
     if !out.status.success() {
         return Err(ServiceError::Command(
             "fido2-token -R".into(),

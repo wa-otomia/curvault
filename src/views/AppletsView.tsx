@@ -9,6 +9,38 @@ import { listReaders, inspectCard } from "../lib/api";
 import type { Reader, CardInfo, Applet } from "../types";
 import LoadingOverlay from "../components/LoadingOverlay";
 
+// Friendly-name catalogue for common AIDs. We try the longest matching
+// prefix first so an applet instance AID still maps to its package name.
+const AID_CATALOGUE: { prefix: string; name: string }[] = [
+  // IsoApplet — most specific first
+  { prefix: "F276A288BCFBA69D34F31001", name: "IsoApplet (instance)" },
+  { prefix: "F276A288BCFBA69D34F310",   name: "IsoApplet (package)" },
+  // FIDO
+  { prefix: "A0000006472F0001",         name: "FIDO U2F applet" },
+  { prefix: "A000000647",               name: "FIDO Alliance" },
+  // GlobalPlatform card manager
+  { prefix: "A0000001515350",           name: "GP SSD package" },
+  { prefix: "A000000151",               name: "GlobalPlatform ISD" },
+  // JavaCard framework / extensions
+  { prefix: "A0000000620204",           name: "javacard.framework" },
+  { prefix: "A0000000620202",           name: "javacardx.crypto" },
+  { prefix: "A0000000620201",           name: "javacard.security" },
+  { prefix: "A0000000620001",           name: "java.lang" },
+  // PIV
+  { prefix: "A000000308",               name: "PIV applet" },
+  // Payment schemes (informational only — not typical on dev cards)
+  { prefix: "A0000000041010",           name: "Mastercard credit/debit" },
+  { prefix: "A0000000031010",           name: "Visa credit/debit" },
+];
+
+function aidName(aid: string): string | null {
+  const clean = aid.replace(/[^0-9A-Fa-f]/g, "").toUpperCase();
+  // Sort by prefix length descending so the longest match wins.
+  const sorted = [...AID_CATALOGUE].sort((a, b) => b.prefix.length - a.prefix.length);
+  const hit = sorted.find((e) => clean.startsWith(e.prefix));
+  return hit ? hit.name : null;
+}
+
 function tagColor(kind: Applet["kind"]): { bg: string; fg: string; label: string } {
   switch (kind) {
     case "ISD": return { bg: "rgba(54,197,255,0.18)", fg: "#9bd9ff", label: "ISD" };
@@ -111,7 +143,7 @@ export default function AppletsView() {
                 <thead>
                   <tr>
                     <th style={{ width: 60 }}>Kind</th>
-                    <th>AID</th>
+                    <th>Name / AID</th>
                     <th style={{ width: 140 }}>State</th>
                     <th>Parent / Privileges</th>
                   </tr>
@@ -119,6 +151,7 @@ export default function AppletsView() {
                 <tbody>
                   {items.map((a) => {
                     const t = tagColor(a.kind);
+                    const name = aidName(a.aid);
                     return (
                       <tr key={a.kind + a.aid}>
                         <td>
@@ -127,7 +160,16 @@ export default function AppletsView() {
                             borderRadius: 3, fontSize: 11, fontWeight: 700,
                           }}>{t.label}</span>
                         </td>
-                        <td><code>{a.aid}</code></td>
+                        <td>
+                          {name && (
+                            <div style={{ color: "var(--accent)", fontWeight: 600, fontSize: 13 }}>
+                              {name}
+                            </div>
+                          )}
+                          <code style={{ fontSize: 11, color: name ? "var(--text-dim)" : "var(--text)" }}>
+                            {a.aid}
+                          </code>
+                        </td>
                         <td style={{ color: stateColor(a.state) }}>{a.state}</td>
                         <td style={{ fontSize: 12, color: "var(--text-dim)" }}>
                           {a.parent && <div><code>{a.parent}</code></div>}

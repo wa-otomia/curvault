@@ -48,6 +48,7 @@ pub struct GpInfo {
 }
 
 #[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct CommandResult {
     pub stdout: String,
     pub stderr: String,
@@ -179,6 +180,25 @@ pub async fn install_cap(
     cap_path: &str,
     instance_aid: Option<&str>,
 ) -> Result<CommandResult> {
+    // Guard against the most common foot-gun: passing in a directory
+    // (or a stale path) — gp reports "Could not read CAP: Is a
+    // directory" which looks scary in the UI. Catch it here with a
+    // clearer message.
+    let path = std::path::Path::new(cap_path);
+    if !path.exists() {
+        return Err(ServiceError::Other(format!("CAP file not found: {cap_path}")));
+    }
+    if path.is_dir() {
+        return Err(ServiceError::Other(format!(
+            "Path is a directory, not a CAP file: {cap_path}"
+        )));
+    }
+    if !path.is_file() {
+        return Err(ServiceError::Other(format!(
+            "Path is not a regular file: {cap_path}"
+        )));
+    }
+
     let mut args: Vec<&str> = vec!["--install", cap_path];
     if let Some(iaid) = instance_aid {
         args.push("--create");

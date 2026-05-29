@@ -4,8 +4,26 @@ import { listReaders, listGpKeys, installApplet, uninstallApplet } from "../lib/
 import type { Reader, GpKeyHandle, CommandResult } from "../types";
 import LoadingOverlay from "../components/LoadingOverlay";
 
-const ISOAPPLET_PKG = "F276A288BCFBA69D34F310";
-const ISOAPPLET_APP = "F276A288BCFBA69D34F31001";
+// Known AID hints — shown next to user-typed AIDs. Add new ones here as
+// they come up. Match is by-prefix so children (instance AIDs) inherit
+// the package's friendly name.
+const KNOWN_AIDS: { prefix: string; name: string }[] = [
+  { prefix: "F276A288BCFBA69D34F310", name: "IsoApplet" },
+  { prefix: "A0000006472F0001", name: "FIDO U2F" },
+  { prefix: "A000000647",       name: "FIDO Alliance" },
+  { prefix: "A000000151",       name: "GlobalPlatform ISD" },
+  { prefix: "A000000003",       name: "PIV" },
+  { prefix: "A0000000620202",   name: "javacardx.crypto" },
+  { prefix: "A0000000620204",   name: "javacard.framework" },
+  { prefix: "A00000062001",     name: "Visa" },
+  { prefix: "A0000000041010",   name: "Mastercard" },
+];
+
+function aidHint(aid: string): string | null {
+  const up = aid.replace(/[^0-9A-Fa-f]/g, "").toUpperCase();
+  const match = KNOWN_AIDS.find((k) => up.startsWith(k.prefix));
+  return match ? match.name : null;
+}
 
 export default function AppletInstallerView() {
   const [readers, setReaders] = useState<Reader[]>([]);
@@ -13,8 +31,12 @@ export default function AppletInstallerView() {
   const [reader, setReader] = useState<string>("");
   const [gpKeyId, setGpKeyId] = useState<string>(""); // "" = use default
   const [capPath, setCapPath] = useState<string>("");
-  const [pkgAid, setPkgAid] = useState(ISOAPPLET_PKG);
-  const [appletAid, setAppletAid] = useState(ISOAPPLET_APP);
+  // AIDs are left blank by default. `gp --install` reads the package and
+  // applet AIDs straight from the CAP file, so they only need to be
+  // typed when overriding (e.g. multiple instance AIDs, or for
+  // documentation / record keeping).
+  const [pkgAid, setPkgAid] = useState("");
+  const [appletAid, setAppletAid] = useState("");
   const [instanceAid, setInstanceAid] = useState("");
   const [busy, setBusy] = useState(true);
   const [result, setResult] = useState<CommandResult | null>(null);
@@ -127,12 +149,30 @@ export default function AppletInstallerView() {
 
         <div className="row">
           <div className="field" style={{ flex: 1 }}>
-            <label>Package AID</label>
-            <input value={pkgAid} onChange={(e) => setPkgAid(e.target.value)} />
+            <label>Package AID (uninstall only)</label>
+            <input
+              value={pkgAid}
+              onChange={(e) => setPkgAid(e.target.value)}
+              placeholder="read from CAP on install"
+            />
+            {pkgAid && aidHint(pkgAid) && (
+              <small style={{ color: "var(--accent)", fontSize: 11 }}>
+                {aidHint(pkgAid)}
+              </small>
+            )}
           </div>
           <div className="field" style={{ flex: 1 }}>
-            <label>Applet AID</label>
-            <input value={appletAid} onChange={(e) => setAppletAid(e.target.value)} />
+            <label>Applet AID (optional)</label>
+            <input
+              value={appletAid}
+              onChange={(e) => setAppletAid(e.target.value)}
+              placeholder="read from CAP"
+            />
+            {appletAid && aidHint(appletAid) && (
+              <small style={{ color: "var(--accent)", fontSize: 11 }}>
+                {aidHint(appletAid)}
+              </small>
+            )}
           </div>
           <div className="field" style={{ flex: 1 }}>
             <label>Instance AID (optional)</label>
@@ -148,7 +188,12 @@ export default function AppletInstallerView() {
           <button className="primary" disabled={busy || !reader || !capPath} onClick={onInstall}>
             Install
           </button>
-          <button className="danger" disabled={busy || !reader} onClick={onUninstall}>
+          <button
+            className="danger"
+            disabled={busy || !reader || !pkgAid.trim()}
+            onClick={onUninstall}
+            title={!pkgAid.trim() ? "Enter the Package AID to uninstall" : ""}
+          >
             Uninstall package
           </button>
         </div>
