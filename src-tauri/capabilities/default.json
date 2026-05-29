@@ -6,8 +6,15 @@
   "permissions": [
     "core:default",
     "core:window:allow-start-dragging",
+    "core:app:allow-version",
     "dialog:default",
     "store:default",
+    {
+      "identifier": "shell:allow-open",
+      "allow": [
+        { "url": "^https?://" }
+      ]
+    },
     {
       "identifier": "shell:allow-execute",
       "allow": [

@@ -10,7 +10,8 @@ export type View =
   | "profiles"
   | "fido2"
   | "issuance"
-  | "sticker";
+  | "sticker"
+  | "about";
 
 const NAV: { id: View; label: string }[] = [
   { id: "dashboard", label: "Dashboard" },
@@ -25,6 +26,7 @@ const NAV: { id: View; label: string }[] = [
   { id: "fido2",     label: "FIDO2" },
   { id: "issuance",  label: "Issuance" },
   { id: "sticker",   label: "Card Sticker" },
+  { id: "about",     label: "About" },
 ];
 
 export default function Sidebar({

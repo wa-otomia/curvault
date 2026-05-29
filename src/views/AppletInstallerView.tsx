@@ -82,12 +82,18 @@ export default function AppletInstallerView() {
   };
 
   const onUninstall = async () => {
-    if (!confirm(`Uninstall package ${pkgAid} from card on ${reader}? This removes ALL applets in that package and all their data.`)) return;
+    // gp --uninstall accepts either a package AID or a CAP file path.
+    // Prefer the AID when typed; otherwise hand gp the CAP file so the
+    // user can pick what to remove via Browse instead of copying the AID.
+    const target = pkgAid.trim() || capPath.trim();
+    if (!target) return;
+    const targetLabel = pkgAid.trim() ? `package ${pkgAid.trim()}` : `package from ${capPath}`;
+    if (!confirm(`Uninstall ${targetLabel} from card on ${reader}? This removes ALL applets in that package and all their data.`)) return;
     setBusy(true);
     setErr(null);
     setResult(null);
     try {
-      const r = await uninstallApplet(reader, gpKeyId || null, pkgAid);
+      const r = await uninstallApplet(reader, gpKeyId || null, target);
       setResult(r);
     } catch (e: unknown) {
       setErr(String(e));
@@ -190,9 +196,15 @@ export default function AppletInstallerView() {
           </button>
           <button
             className="danger"
-            disabled={busy || !reader || !pkgAid.trim()}
+            disabled={busy || !reader || (!pkgAid.trim() && !capPath.trim())}
             onClick={onUninstall}
-            title={!pkgAid.trim() ? "Enter the Package AID to uninstall" : ""}
+            title={
+              !pkgAid.trim() && !capPath.trim()
+                ? "Enter a Package AID or pick a CAP file"
+                : pkgAid.trim()
+                ? `gp --uninstall ${pkgAid.trim()}`
+                : `gp --uninstall ${capPath}  (reads AID from CAP)`
+            }
           >
             Uninstall package
           </button>

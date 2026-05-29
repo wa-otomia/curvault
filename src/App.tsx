@@ -14,6 +14,7 @@ import ProfilesView from "./views/ProfilesView";
 import Fido2View from "./views/Fido2View";
 import IssuanceView from "./views/IssuanceView";
 import StickerView from "./views/StickerView";
+import AboutView from "./views/AboutView";
 
 export default function App() {
   const [view, setView] = useState<View>("dashboard");
@@ -43,6 +44,7 @@ export default function App() {
             {view === "fido2" && <Fido2View />}
             {view === "issuance" && <IssuanceView />}
             {view === "sticker" && <StickerView />}
+            {view === "about" && <AboutView />}
           </div>
           <LogPanel />
           <StatusBar />

@@ -1,45 +1,22 @@
 // Dedicated viewer for the GP applet / package listing of a card.
 //
-// Wraps `inspect_card` (which already runs `gp --info --list`) but auto-
-// fetches as soon as the user picks a reader, so the applets are visible
-// without clicking through Readers > Inspect.
+// Auto-fetches on reader selection so the applets are visible without
+// the user clicking through Readers > Inspect. Each non-protected row
+// gets a Delete action that runs `gp --uninstall <AID>` against the
+// selected reader and GP key — protected rows (ISD/SSD, the javacard
+// standard packages) keep the action greyed out so the user cannot
+// brick the card from the UI.
 
 import { useEffect, useState } from "react";
-import { listReaders, inspectCard } from "../lib/api";
-import type { Reader, CardInfo, Applet } from "../types";
+import {
+  listReaders,
+  listGpKeys,
+  inspectCard,
+  uninstallApplet,
+} from "../lib/api";
+import type { Reader, CardInfo, Applet, GpKeyHandle } from "../types";
 import LoadingOverlay from "../components/LoadingOverlay";
-
-// Friendly-name catalogue for common AIDs. We try the longest matching
-// prefix first so an applet instance AID still maps to its package name.
-const AID_CATALOGUE: { prefix: string; name: string }[] = [
-  // IsoApplet — most specific first
-  { prefix: "F276A288BCFBA69D34F31001", name: "IsoApplet (instance)" },
-  { prefix: "F276A288BCFBA69D34F310",   name: "IsoApplet (package)" },
-  // FIDO
-  { prefix: "A0000006472F0001",         name: "FIDO U2F applet" },
-  { prefix: "A000000647",               name: "FIDO Alliance" },
-  // GlobalPlatform card manager
-  { prefix: "A0000001515350",           name: "GP SSD package" },
-  { prefix: "A000000151",               name: "GlobalPlatform ISD" },
-  // JavaCard framework / extensions
-  { prefix: "A0000000620204",           name: "javacard.framework" },
-  { prefix: "A0000000620202",           name: "javacardx.crypto" },
-  { prefix: "A0000000620201",           name: "javacard.security" },
-  { prefix: "A0000000620001",           name: "java.lang" },
-  // PIV
-  { prefix: "A000000308",               name: "PIV applet" },
-  // Payment schemes (informational only — not typical on dev cards)
-  { prefix: "A0000000041010",           name: "Mastercard credit/debit" },
-  { prefix: "A0000000031010",           name: "Visa credit/debit" },
-];
-
-function aidName(aid: string): string | null {
-  const clean = aid.replace(/[^0-9A-Fa-f]/g, "").toUpperCase();
-  // Sort by prefix length descending so the longest match wins.
-  const sorted = [...AID_CATALOGUE].sort((a, b) => b.prefix.length - a.prefix.length);
-  const hit = sorted.find((e) => clean.startsWith(e.prefix));
-  return hit ? hit.name : null;
-}
+import { aidName, isProtectedAid } from "../lib/aids";
 
 function tagColor(kind: Applet["kind"]): { bg: string; fg: string; label: string } {
   switch (kind) {
@@ -57,59 +34,125 @@ function stateColor(state: string): string {
   return "var(--text-dim)";
 }
 
+/** True if the row's AID + kind combination should be protected from
+ *  deletion. ISD/SSD rows are always protected regardless of catalogue
+ *  membership. */
+function isProtectedRow(a: Applet): boolean {
+  if (a.kind === "ISD") return true;
+  return isProtectedAid(a.aid);
+}
+
 export default function AppletsView() {
   const [readers, setReaders] = useState<Reader[]>([]);
+  const [keys, setKeys] = useState<GpKeyHandle[]>([]);
   const [reader, setReader] = useState("");
+  const [gpKeyId, setGpKeyId] = useState("");
   const [card, setCard] = useState<CardInfo | null>(null);
-  const [busy, setBusy] = useState(false);
+  const [busy, setBusy] = useState(true);
   const [err, setErr] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
 
   useEffect(() => {
     setBusy(true);
-    listReaders()
-      .then((rs) => {
+    Promise.all([listReaders(), listGpKeys()])
+      .then(([rs, ks]) => {
         setReaders(rs);
+        setKeys(ks);
         const r = rs.find((r) => r.hasCard);
         if (r) setReader(r.name);
-        else setBusy(false); // no card → no inspect → done
+        else setBusy(false);
       })
       .catch((e) => { setErr(String(e)); setBusy(false); });
   }, []);
 
-  useEffect(() => {
-    if (!reader) return;
+  const refreshCard = async (r = reader) => {
+    if (!r) return;
     setBusy(true);
     setErr(null);
-    setCard(null);
-    inspectCard(reader)
-      .then(setCard)
-      .catch((e) => setErr(String(e)))
-      .finally(() => setBusy(false));
+    try {
+      setCard(await inspectCard(r));
+    } catch (e: unknown) {
+      setErr(String(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  useEffect(() => {
+    if (reader) refreshCard(reader);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [reader]);
 
-  const isds  = card?.applets.filter((a) => a.kind === "ISD") ?? [];
-  const apps  = card?.applets.filter((a) => a.kind === "APP") ?? [];
-  const pkgs  = card?.applets.filter((a) => a.kind === "PKG") ?? [];
+  const onDelete = async (a: Applet) => {
+    if (!reader) return;
+    if (isProtectedRow(a)) return;
+    const name = aidName(a.aid) ?? a.aid;
+    if (!confirm(
+      `Uninstall ${a.kind} '${name}'?\n\n` +
+      `AID: ${a.aid}\n` +
+      `This calls gp --uninstall and removes the package and every applet inside it.\n` +
+      `This action is irreversible.`,
+    )) return;
+
+    setBusy(true);
+    setErr(null);
+    setNotice(null);
+    try {
+      const r = await uninstallApplet(reader, gpKeyId || null, a.aid);
+      if (r.exitCode !== 0) {
+        setErr(`gp --uninstall exited ${r.exitCode}: ${r.stderr || r.stdout}`);
+      } else {
+        setNotice(`Uninstalled ${name}.`);
+        await refreshCard();
+      }
+    } catch (e: unknown) {
+      setErr(String(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const isds = card?.applets.filter((a) => a.kind === "ISD") ?? [];
+  const apps = card?.applets.filter((a) => a.kind === "APP") ?? [];
+  const pkgs = card?.applets.filter((a) => a.kind === "PKG") ?? [];
 
   return (
     <>
       <LoadingOverlay show={busy} label="Reading card…" />
+
       <div className="row" style={{ justifyContent: "space-between" }}>
         <h2 style={{ margin: 0 }}>Installed Applets</h2>
-        <button onClick={() => reader && inspectCard(reader).then(setCard).catch((e) => setErr(String(e)))}>
-          Refresh
-        </button>
+        <button onClick={() => refreshCard()} disabled={!reader || busy}>Refresh</button>
       </div>
 
       <div className="card">
-        <div className="field">
-          <label>Reader</label>
-          <select value={reader} onChange={(e) => setReader(e.target.value)}>
-            <option value="">— pick reader with a card —</option>
-            {readers.filter((r) => r.hasCard).map((r) => (
-              <option key={r.name} value={r.name}>{r.name}</option>
-            ))}
-          </select>
+        <div className="row">
+          <div className="field" style={{ flex: 1, marginBottom: 0 }}>
+            <label>Reader</label>
+            <select value={reader} onChange={(e) => setReader(e.target.value)}>
+              <option value="">— pick reader with a card —</option>
+              {readers.filter((r) => r.hasCard).map((r) => (
+                <option key={r.name} value={r.name}>{r.name}</option>
+              ))}
+            </select>
+          </div>
+          <div className="field" style={{ flex: 1, marginBottom: 0 }}>
+            <label>GP key (for Delete)</label>
+            <select value={gpKeyId} onChange={(e) => setGpKeyId(e.target.value)}>
+              <option value="">Default test key (40 41 42 … 4F)</option>
+              {keys.map((k) => {
+                const parts: string[] = [];
+                if (k.note) parts.push(k.note);
+                parts.push(k.id);
+                if (k.cardSerial) parts.push(`card ${k.cardSerial}`);
+                return (
+                  <option key={k.id} value={k.id} title={k.note ?? ""}>
+                    {parts.join(" · ")}
+                  </option>
+                );
+              })}
+            </select>
+          </div>
         </div>
         {card && (
           <div className="row" style={{ marginTop: ".5rem", fontSize: 12, color: "var(--text-dim)" }}>
@@ -125,8 +168,11 @@ export default function AppletsView() {
           <pre>{err}</pre>
         </div>
       )}
-
-      {busy && <div className="empty">Reading card…</div>}
+      {notice && (
+        <div className="card" style={{ borderColor: "var(--ok)" }}>
+          {notice}
+        </div>
+      )}
 
       {card && card.applets.length === 0 && !busy && (
         <div className="empty">Card is empty (no Security Domain, applets, or packages found).</div>
@@ -146,12 +192,14 @@ export default function AppletsView() {
                     <th>Name / AID</th>
                     <th style={{ width: 140 }}>State</th>
                     <th>Parent / Privileges</th>
+                    <th style={{ width: 90 }}></th>
                   </tr>
                 </thead>
                 <tbody>
                   {items.map((a) => {
                     const t = tagColor(a.kind);
                     const name = aidName(a.aid);
+                    const protectedRow = isProtectedRow(a);
                     return (
                       <tr key={a.kind + a.aid}>
                         <td>
@@ -178,6 +226,20 @@ export default function AppletsView() {
                               {a.privileges.length > 3 && ` (+${a.privileges.length - 3})`}
                             </div>
                           )}
+                        </td>
+                        <td>
+                          <button
+                            className="danger"
+                            disabled={busy || protectedRow}
+                            onClick={() => onDelete(a)}
+                            title={
+                              protectedRow
+                                ? "System component — uninstalling would brick the card"
+                                : `gp --uninstall ${a.aid}`
+                            }
+                          >
+                            Delete
+                          </button>
                         </td>
                       </tr>
                     );
