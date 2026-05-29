@@ -97,7 +97,31 @@ pub fn generate(card_serial: Option<String>, note: Option<String>) -> Result<GpK
     rand::thread_rng().fill_bytes(&mut bytes);
     let hex_key = hex::encode_upper(bytes);
 
+    // Write to the OS keychain.
     Entry::new(SERVICE, &id)?.set_password(&hex_key)?;
+
+    // Immediately read it back. On macOS, ad-hoc-signed apps occasionally
+    // see a SecItemAdd succeed (no error reported) but a subsequent
+    // SecItemCopyMatching come back empty — usually because Gatekeeper /
+    // codesigning attributes mismatch and the OS routes the lookup to a
+    // different keychain. Catch this here so the UI never shows a "key
+    // stored" message for a key it later cannot retrieve.
+    let written_back = Entry::new(SERVICE, &id)?
+        .get_password()
+        .map_err(|e| ServiceError::Other(format!(
+            "Generated a GP key but could not read it back from the OS \
+             keychain ({e}). This usually means the keychain is rejecting \
+             writes from this build (common with ad-hoc-signed macOS apps \
+             after a system upgrade). Open Keychain Access, delete any \
+             stale 'com.waotomia.curvault' entries, and try again — or \
+             rebuild the app from source so its code signature is fresh."
+        )))?;
+    if written_back != hex_key {
+        return Err(ServiceError::Other(
+            "Keychain returned a different value than was just written. \
+             The OS keychain is in an inconsistent state for this app.".into(),
+        ));
+    }
 
     let handle = GpKeyHandle {
         id: id.clone(),
@@ -117,7 +141,24 @@ pub fn generate(card_serial: Option<String>, note: Option<String>) -> Result<GpK
 }
 
 pub fn read_key_hex(id: &str) -> Result<String> {
-    Ok(Entry::new(SERVICE, id)?.get_password()?)
+    Entry::new(SERVICE, id)?
+        .get_password()
+        .map_err(|e| {
+            // Specifically map NoEntry to something actionable. Other
+            // keyring errors fall through as-is.
+            let msg = e.to_string();
+            if msg.contains("No matching entry") || msg.contains("NoEntry") {
+                ServiceError::Other(format!(
+                    "Key '{id}' is in the metadata file but missing from the OS \
+                     keychain. The most likely cause is an app upgrade — \
+                     ad-hoc-signed macOS apps lose access to keychain items \
+                     written by the previous build. Click Delete on this row \
+                     to clean up the stale handle, then Generate a fresh GP key."
+                ))
+            } else {
+                ServiceError::Keychain(e)
+            }
+        })
 }
 
 pub fn delete(id: &str) -> Result<()> {

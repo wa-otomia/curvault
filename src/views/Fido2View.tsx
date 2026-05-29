@@ -10,6 +10,31 @@ import {
 import type { Fido2Device, Fido2Info, ResidentCredential } from "../types";
 import LoadingOverlay from "../components/LoadingOverlay";
 
+/**
+ * libfido2 prints the user id as base64. Most RPs encode a readable
+ * display string into that field (webauthn.io for instance encodes
+ * "webauthn.io-vaag"), so we try to decode it. If the bytes don't form
+ * valid printable UTF-8, fall back to the raw base64 — never throw.
+ */
+function decodeUserId(b64: string | undefined | null): string | null {
+  if (!b64) return null;
+  try {
+    const bytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+    const text = new TextDecoder("utf-8", { fatal: false }).decode(bytes);
+    // Printable ASCII / common whitespace only.
+    if (text.length > 0 && /^[\x20-\x7E\s]+$/.test(text)) return text;
+    return b64;
+  } catch {
+    return b64;
+  }
+}
+
+/** Visible head + tail with an ellipsis for very long base64 ids. */
+function shortenCredId(id: string): string {
+  if (id.length <= 28) return id;
+  return `${id.slice(0, 14)}…${id.slice(-10)}`;
+}
+
 export default function Fido2View() {
   const [devices, setDevices] = useState<Fido2Device[]>([]);
   const [selected, setSelected] = useState<Fido2Device | null>(null);
@@ -235,23 +260,53 @@ export default function Fido2View() {
           ) : creds.length === 0 ? (
             <div className="empty">No resident credentials on this device.</div>
           ) : (
-            <table>
+            <table style={{ tableLayout: "fixed", width: "100%" }}>
+              <colgroup>
+                <col style={{ width: "22%" }} />
+                <col style={{ width: "30%" }} />
+                <col style={{ width: "38%" }} />
+                <col style={{ width: "10%" }} />
+              </colgroup>
               <thead>
                 <tr><th>RP ID</th><th>User</th><th>Credential ID</th><th></th></tr>
               </thead>
               <tbody>
-                {creds.map((c) => (
-                  <tr key={c.credentialId}>
-                    <td>{c.rpId}</td>
-                    <td>{c.userName ?? c.userDisplayName ?? "—"}</td>
-                    <td><code style={{ fontSize: 11 }}>{c.credentialId}</code></td>
-                    <td>
-                      <button className="danger" onClick={() => onDeleteCred(c)} disabled={busy}>
-                        Delete
-                      </button>
-                    </td>
-                  </tr>
-                ))}
+                {creds.map((c) => {
+                  const decoded =
+                    decodeUserId(c.userName) ?? c.userDisplayName ?? null;
+                  // Show the display name if libfido2 actually returned one
+                  // and it differs from the decoded user id.
+                  const showDisplay =
+                    c.userDisplayName &&
+                    c.userDisplayName !== c.userName &&
+                    c.userDisplayName !== decoded;
+                  return (
+                    <tr key={c.credentialId}>
+                      <td style={{ overflow: "hidden", textOverflow: "ellipsis" }}
+                          title={c.rpId}>
+                        {c.rpId}
+                      </td>
+                      <td title={c.userName ?? ""}>
+                        <div style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                          {decoded ?? "—"}
+                        </div>
+                        {showDisplay && (
+                          <div style={{ fontSize: 11, color: "var(--text-dim)" }}>
+                            {c.userDisplayName}
+                          </div>
+                        )}
+                      </td>
+                      <td title={c.credentialId}>
+                        <code style={{ fontSize: 11 }}>{shortenCredId(c.credentialId)}</code>
+                      </td>
+                      <td>
+                        <button className="danger" onClick={() => onDeleteCred(c)} disabled={busy}>
+                          Delete
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           )}
