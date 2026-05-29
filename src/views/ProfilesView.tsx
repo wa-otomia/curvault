@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { listProfiles, saveProfile, deleteProfile } from "../lib/api";
 import type { Profile, KeyPlanEntry } from "../types";
 import LoadingOverlay from "../components/LoadingOverlay";
+import { confirmAction } from "../lib/dialog";
 
 const blankProfile = (): Profile => ({
   id: crypto.randomUUID(),
@@ -62,7 +63,7 @@ export default function ProfilesView() {
   };
 
   const onDelete = async (id: string) => {
-    if (!confirm("Delete this profile?")) return;
+    if (!(await confirmAction("Delete this profile?", { title: "Delete profile", danger: true, okLabel: "Delete" }))) return;
     try {
       await deleteProfile(id);
       await refresh();

@@ -9,6 +9,7 @@ import {
 } from "../lib/api";
 import type { Fido2Device, Fido2Info, ResidentCredential } from "../types";
 import LoadingOverlay from "../components/LoadingOverlay";
+import { confirmAction } from "../lib/dialog";
 
 /**
  * libfido2 prints the user id as base64. Most RPs encode a readable
@@ -44,6 +45,13 @@ export default function Fido2View() {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+
+  // Inline "Set / change PIN" form state (replaces window.prompt, which
+  // does not work inside the Tauri webview).
+  const [pinFormOpen, setPinFormOpen] = useState(false);
+  const [oldPin, setOldPin] = useState("");
+  const [newPin, setNewPin] = useState("");
+  const [newPin2, setNewPin2] = useState("");
 
   const refreshDevices = async () => {
     setErr(null);
@@ -94,7 +102,10 @@ export default function Fido2View() {
 
   const onDeleteCred = async (cred: ResidentCredential) => {
     if (!selected) return;
-    if (!confirm(`Delete credential for ${cred.rpId}? The user will lose passwordless login for that site.`)) return;
+    if (!(await confirmAction(
+      `Delete credential for ${cred.rpId}?\n\nThe user will lose passwordless login for that site.`,
+      { title: "Delete credential", danger: true, okLabel: "Delete" },
+    ))) return;
     setBusy(true);
     try {
       await fido2DeleteCredential({
@@ -111,12 +122,18 @@ export default function Fido2View() {
     }
   };
 
-  const onChangePin = async () => {
+  const onApplyPin = async () => {
     if (!selected) return;
-    const oldPin = prompt("Current PIN (leave empty if device has no PIN yet):") ?? "";
-    const newPin = prompt("New PIN (4-63 chars):") ?? "";
-    if (!newPin) return;
+    if (newPin.length < 4) {
+      setErr("New PIN must be at least 4 characters.");
+      return;
+    }
+    if (newPin !== newPin2) {
+      setErr("The two new-PIN entries do not match.");
+      return;
+    }
     setBusy(true);
+    setErr(null);
     try {
       await fido2SetPin({
         devicePath: selected.path,
@@ -124,6 +141,8 @@ export default function Fido2View() {
         newPin,
       });
       setNotice("PIN updated.");
+      setPinFormOpen(false);
+      setOldPin(""); setNewPin(""); setNewPin2("");
     } catch (e: unknown) {
       setErr(String(e));
     } finally {
@@ -133,12 +152,13 @@ export default function Fido2View() {
 
   const onReset = async () => {
     if (!selected) return;
-    if (!confirm(
+    if (!(await confirmAction(
       "FACTORY RESET this authenticator?\n\n" +
       "All resident credentials and the PIN will be wiped. " +
       "The reset window is ~10s after the device is plugged in / tapped. " +
-      "Re-insert the device, then click OK quickly.",
-    )) return;
+      "Re-insert the device, then confirm quickly.",
+      { title: "Factory reset authenticator", danger: true, okLabel: "Factory reset" },
+    ))) return;
     setBusy(true);
     try {
       await fido2Reset(selected.path);
@@ -190,9 +210,45 @@ export default function Fido2View() {
         <div className="card">
           <h3>Selected: {selected.product}</h3>
           <div className="row">
-            <button onClick={onChangePin} disabled={busy}>Set / change PIN</button>
+            <button onClick={() => { setPinFormOpen(!pinFormOpen); setErr(null); }} disabled={busy}>
+              {pinFormOpen ? "Cancel PIN change" : "Set / change PIN"}
+            </button>
             <button onClick={onReset} className="danger" disabled={busy}>Factory reset</button>
           </div>
+
+          {pinFormOpen && (
+            <div
+              style={{
+                marginTop: "0.75rem",
+                padding: "0.9rem 1rem",
+                border: "1px solid var(--border-hi)",
+                borderRadius: 8,
+                background: "rgba(54,197,255,0.04)",
+              }}
+            >
+              <div className="field">
+                <label>Current PIN (leave empty if no PIN set yet)</label>
+                <input type="password" value={oldPin} onChange={(e) => setOldPin(e.target.value)} autoComplete="off" />
+              </div>
+              <div className="row">
+                <div className="field" style={{ flex: 1 }}>
+                  <label>New PIN (≥ 4 chars)</label>
+                  <input type="password" value={newPin} onChange={(e) => setNewPin(e.target.value)} autoComplete="off" />
+                </div>
+                <div className="field" style={{ flex: 1 }}>
+                  <label>Confirm new PIN</label>
+                  <input type="password" value={newPin2} onChange={(e) => setNewPin2(e.target.value)} autoComplete="off" />
+                </div>
+              </div>
+              <button
+                className="primary"
+                onClick={onApplyPin}
+                disabled={busy || newPin.length < 4 || newPin !== newPin2}
+              >
+                Apply PIN
+              </button>
+            </div>
+          )}
 
           {info && (
             <div style={{ marginTop: "1rem" }}>

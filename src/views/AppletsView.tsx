@@ -17,6 +17,7 @@ import {
 import type { Reader, CardInfo, Applet, GpKeyHandle } from "../types";
 import LoadingOverlay from "../components/LoadingOverlay";
 import { aidName, isProtectedAid } from "../lib/aids";
+import { confirmAction } from "../lib/dialog";
 
 function tagColor(kind: Applet["kind"]): { bg: string; fg: string; label: string } {
   switch (kind) {
@@ -87,12 +88,13 @@ export default function AppletsView() {
     if (!reader) return;
     if (isProtectedRow(a)) return;
     const name = aidName(a.aid) ?? a.aid;
-    if (!confirm(
+    if (!(await confirmAction(
       `Uninstall ${a.kind} '${name}'?\n\n` +
       `AID: ${a.aid}\n` +
       `This calls gp --uninstall and removes the package and every applet inside it.\n` +
       `This action is irreversible.`,
-    )) return;
+      { title: "Uninstall applet", danger: true, okLabel: "Uninstall" },
+    ))) return;
 
     setBusy(true);
     setErr(null);

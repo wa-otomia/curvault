@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { listGpKeys, generateGpKey, deleteGpKey, listReaders, lockGpKey } from "../lib/api";
 import type { GpKeyHandle, Reader } from "../types";
 import LoadingOverlay from "../components/LoadingOverlay";
+import { confirmAction } from "../lib/dialog";
 
 export default function GpKeysView() {
   const [keys, setKeys] = useState<GpKeyHandle[]>([]);
@@ -45,7 +46,10 @@ export default function GpKeysView() {
   };
 
   const onDelete = async (id: string) => {
-    if (!confirm(`Delete ${id}? If this key still locks a card, that card will become unmanageable.`)) return;
+    if (!(await confirmAction(
+      `Delete ${id}?\n\nIf this key still locks a card, that card will become unmanageable.`,
+      { title: "Delete GP key", danger: true, okLabel: "Delete" },
+    ))) return;
     setBusy(true);
     try {
       await deleteGpKey(id);
@@ -63,11 +67,12 @@ export default function GpKeysView() {
       setErr("Insert a card first.");
       return;
     }
-    if (!confirm(
+    if (!(await confirmAction(
       `Rotate the GP key on '${reader}' to ${keyId}?\n\n` +
       `THIS IS IRREVERSIBLE. After this, only this key can manage the card.\n` +
       `Lose it → card is bricked.`,
-    )) return;
+      { title: "Lock card to GP key", danger: true, okLabel: "Lock card" },
+    ))) return;
     setBusy(true);
     try {
       await lockGpKey(reader, keyId);

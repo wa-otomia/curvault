@@ -3,6 +3,7 @@ import { open } from "@tauri-apps/plugin-dialog";
 import { listReaders, listGpKeys, installApplet, uninstallApplet } from "../lib/api";
 import type { Reader, GpKeyHandle, CommandResult } from "../types";
 import LoadingOverlay from "../components/LoadingOverlay";
+import { confirmAction } from "../lib/dialog";
 
 // Known AID hints — shown next to user-typed AIDs. Add new ones here as
 // they come up. Match is by-prefix so children (instance AIDs) inherit
@@ -88,7 +89,10 @@ export default function AppletInstallerView() {
     const target = pkgAid.trim() || capPath.trim();
     if (!target) return;
     const targetLabel = pkgAid.trim() ? `package ${pkgAid.trim()}` : `package from ${capPath}`;
-    if (!confirm(`Uninstall ${targetLabel} from card on ${reader}? This removes ALL applets in that package and all their data.`)) return;
+    if (!(await confirmAction(
+      `Uninstall ${targetLabel} from card on ${reader}?\n\nThis removes ALL applets in that package and all their data.`,
+      { title: "Uninstall package", danger: true, okLabel: "Uninstall" },
+    ))) return;
     setBusy(true);
     setErr(null);
     setResult(null);
