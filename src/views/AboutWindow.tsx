@@ -24,7 +24,7 @@ export default function AboutWindow() {
 
   const onClose = () => {
     setClosing(true);
-    setTimeout(() => getCurrentWindow().close().catch(() => {}), 300);
+    setTimeout(() => getCurrentWindow().close().catch(() => {}), 230);
   };
   const onOpenRepo = () => { openExternal(REPO_URL).catch(() => {}); };
   const onCheckUpdate = () => { openUpdaterWindow().catch(() => {}); };

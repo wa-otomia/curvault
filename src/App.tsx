@@ -32,8 +32,10 @@ export default function App() {
   // on the whole app, then exit.
   useEffect(() => {
     const unlisten = listen("app://close", () => {
-      document.getElementById("root")?.classList.add("app-closing");
-      setTimeout(() => { exit(0).catch(() => {}); }, 300);
+      // Animate <body> (not #root) so the tinted background fades to the
+      // transparent/vibrancy surface instead of leaving a dark blob.
+      document.body.classList.add("app-closing");
+      setTimeout(() => { exit(0).catch(() => {}); }, 230);
     });
     return () => { unlisten.then((f) => f()); };
   }, []);

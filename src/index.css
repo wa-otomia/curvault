@@ -631,18 +631,20 @@ th {
   cursor: default;
 }
 
-/* Dismiss animation: shrink + fade + blur out over 0.3s on a smooth ease
- * curve, then the window is actually closed (the JS waits for this). Shared
- * by the frameless popups and the main window (#root.app-closing). */
+/* Dismiss animation: shrink + fade + blur out on an accelerating curve so it
+ * snaps shut fast, then the window is actually closed (the JS waits for this).
+ * The frameless popups animate their panel; the MAIN window animates <body>
+ * so its tinted background fades too (animating #root left the dark tint
+ * behind as a "black blob"). */
 .updater-root.closing,
-#root.app-closing {
-  animation: popupClose 0.3s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+body.app-closing {
+  animation: popupClose 0.2s cubic-bezier(0.6, 0, 1, 1) forwards;
   transform-origin: center center;
   pointer-events: none;
 }
 @keyframes popupClose {
   from { opacity: 1; transform: scale(1);    filter: blur(0); }
-  to   { opacity: 0; transform: scale(0.92); filter: blur(8px); }
+  to   { opacity: 0; transform: scale(0.9);  filter: blur(10px); }
 }
 
 .updater-content {

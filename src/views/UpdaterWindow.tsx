@@ -90,7 +90,7 @@ export default function UpdaterWindow() {
   // Play the dismiss animation, then actually close the window.
   const onClose = () => {
     setClosing(true);
-    setTimeout(() => getCurrentWindow().close().catch(() => {}), 300);
+    setTimeout(() => getCurrentWindow().close().catch(() => {}), 230);
   };
 
   return (
