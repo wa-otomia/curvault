@@ -598,3 +598,160 @@ th {
   max-height: 200px;
   overflow: auto;
 }
+
+/* -------- updater window (frameless, rounded, draggable) -------- */
+
+/* The updater window is transparent + frameless; this opaque rounded panel
+ * is the visible surface. Body is forced transparent (set in main.tsx) so the
+ * corners outside the radius show through. */
+.updater-root {
+  position: relative;
+  overflow: hidden;
+  min-height: 100vh;
+  border-radius: 16px;
+  background: var(--bg);
+  border: 1px solid rgba(120, 160, 255, 0.12);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 1.75rem 1.75rem 1.4rem;
+  -webkit-user-select: none;
+  user-select: none;
+  cursor: default;
+}
+
+.updater-content {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  max-width: 360px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.updater-title {
+  margin: 0.2rem 0 0;
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+}
+
+/* Fixed-height stage keeps the window from reflowing as states change. */
+.updater-stage {
+  width: 100%;
+  min-height: 188px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.updater-panel {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.55rem;
+  text-align: center;
+}
+
+/* Each state change replays this fade so content eases in instead of
+ * snapping. Keyed by state in React so progress ticks don't re-trigger it. */
+.updater-fade {
+  animation: updaterFade 0.32s ease;
+}
+@keyframes updaterFade {
+  from { opacity: 0; transform: translateY(7px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.updater-headline { margin: 0; font-weight: 600; font-size: 15px; }
+.updater-sub {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-dim);
+  line-height: 1.5;
+  font-variant-numeric: tabular-nums; /* stop digits from shifting width */
+}
+.updater-version {
+  margin-top: 1rem;
+  color: var(--text-mute);
+  font-size: 11px;
+}
+
+.updater-actions {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.4rem;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.updater-notes {
+  max-height: 150px;
+  width: 100%;
+  margin: 0.2rem 0;
+  font-size: 11px;
+  white-space: pre-wrap;
+  text-align: left;
+  background: rgba(0, 0, 0, 0.28);
+  border-radius: 6px;
+  padding: 0.6rem 0.7rem;
+  overflow: auto;
+}
+
+/* Close affordance for the frameless window. */
+.updater-close {
+  position: absolute;
+  top: 12px;
+  right: 13px;
+  z-index: 2;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  line-height: 1;
+  border-radius: 7px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text-dim);
+}
+.updater-close:hover { background: rgba(255, 255, 255, 0.10); color: var(--text); }
+
+/* Progress bar: real percentage when known, sliding indeterminate when not. */
+.updater-progress {
+  position: relative;
+  width: 100%;
+  height: 6px;
+  margin-top: 0.4rem;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.updater-progress-fill {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  background: linear-gradient(90deg, #36c5ff, #1b4fd6);
+  border-radius: 3px;
+  transition: width 0.2s ease;
+}
+.updater-progress-indeterminate {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 38%;
+  background: linear-gradient(90deg, rgba(54,197,255,0) 0%, #36c5ff 50%, rgba(27,79,214,0) 100%);
+  border-radius: 3px;
+  animation: updaterSlide 1.15s ease-in-out infinite;
+}
+@keyframes updaterSlide {
+  0%   { left: -40%; }
+  100% { left: 100%; }
+}

@@ -9,12 +9,18 @@ import BrandLogo from "../components/BrandLogo";
 
 const REPO_URL = "https://github.com/wa-otomia/curvault";
 
+// Whole window is draggable (frameless); spread onto non-interactive nodes.
+const DRAG = { "data-tauri-drag-region": true } as const;
+// Buttons stop mousedown so a drag never starts on them (belt-and-suspenders
+// in case the runtime matches drag regions by ancestor rather than target).
+const noDrag = { onMouseDown: (e: React.MouseEvent) => e.stopPropagation() };
+
 type State =
   | { kind: "checking" }
   | { kind: "up-to-date"; current: string }
   | { kind: "available"; update: Update }
   | { kind: "downloading"; update: Update; received: number; total: number | null }
-  | { kind: "ready"; version: string } // downloaded & staged — waiting for manual restart
+  | { kind: "ready"; version: string }
   | { kind: "error"; message: string };
 
 function fmtBytes(n: number): string {
@@ -26,6 +32,13 @@ function fmtBytes(n: number): string {
 export default function UpdaterWindow() {
   const [state, setState] = useState<State>({ kind: "checking" });
   const [version, setVersion] = useState("");
+
+  // Frameless + transparent window: make the page background transparent so
+  // the rounded panel's corners show through.
+  useEffect(() => {
+    document.documentElement.style.background = "transparent";
+    document.body.style.background = "transparent";
+  }, []);
 
   const runCheck = async () => {
     setState({ kind: "checking" });
@@ -66,8 +79,7 @@ export default function UpdaterWindow() {
             break;
         }
       });
-      // Staged but NOT relaunched — the user restarts manually.
-      setState({ kind: "ready", version: update.version });
+      setState({ kind: "ready", version: update.version }); // manual restart
     } catch (e: unknown) {
       setState({ kind: "error", message: String(e) });
     }
@@ -77,130 +89,122 @@ export default function UpdaterWindow() {
     try { await relaunch(); }
     catch (e: unknown) { setState({ kind: "error", message: String(e) }); }
   };
-
   const onClose = () => { getCurrentWindow().close().catch(() => {}); };
 
   return (
-    <div
-      style={{
-        position: "relative",
-        overflow: "hidden",
-        minHeight: "100vh",
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        justifyContent: "center",
-        gap: "0.85rem",
-        padding: "2rem 1.75rem",
-        textAlign: "center",
-        background: "var(--bg)",
-        color: "var(--text)",
-      }}
-    >
-      <BrandBackdrop opacity={0.55} />
+    <div className="updater-root" {...DRAG}>
+      <BrandBackdrop opacity={0.5} />
+      <button className="updater-close" {...noDrag} onClick={onClose} title="Close">×</button>
 
-      <div style={{ position: "relative", zIndex: 1, width: "100%", maxWidth: 380, display: "flex", flexDirection: "column", alignItems: "center", gap: "0.85rem" }}>
-        <BrandLogo size={96} />
-        <h1 style={{ margin: 0, fontSize: 22, fontWeight: 700, letterSpacing: 0.5 }}>Software Update</h1>
+      <div className="updater-content" {...DRAG}>
+        <div {...DRAG}><BrandLogo size={84} /></div>
+        <h1 className="updater-title" {...DRAG}>Software Update</h1>
 
-        {state.kind === "checking" && (
-          <p style={{ color: "var(--text-dim)", margin: 0 }}>Checking for updates…</p>
-        )}
-
-        {state.kind === "up-to-date" && (
-          <>
-            <p style={{ margin: 0, fontWeight: 600 }}>You're up to date.</p>
-            <p style={{ color: "var(--text-dim)", fontSize: 13, margin: 0 }}>
-              v{state.current} is the newest signed release.
-            </p>
-            <div style={{ display: "flex", gap: "0.5rem", marginTop: "0.5rem" }}>
-              <button onClick={runCheck}>Check again</button>
-              <button className="primary" onClick={onClose}>Close</button>
-            </div>
-          </>
-        )}
-
-        {state.kind === "available" && (
-          <>
-            <p style={{ margin: 0, fontWeight: 600 }}>Update available · v{state.update.version}</p>
-            <p style={{ color: "var(--text-dim)", fontSize: 13, margin: 0 }}>
-              You're on v{state.update.currentVersion}.
-              {state.update.date && ` Released ${new Date(state.update.date).toLocaleDateString()}.`}
-            </p>
-            {state.update.body && (
-              <pre style={{
-                maxHeight: 200, width: "100%", marginTop: 4, fontSize: 11,
-                whiteSpace: "pre-wrap", textAlign: "left",
-                background: "rgba(0,0,0,0.28)", borderRadius: 6, padding: "0.6rem 0.7rem",
-              }}>
-                {state.update.body.slice(0, 1200)}
-                {state.update.body.length > 1200 ? "\n…" : ""}
-              </pre>
-            )}
-            <div style={{ display: "flex", gap: "0.5rem", marginTop: "0.5rem", flexWrap: "wrap", justifyContent: "center" }}>
-              <button className="primary" onClick={onDownload}>Download &amp; install</button>
-              <button onClick={() => openExternal(`${REPO_URL}/releases/tag/v${state.update.version}`).catch(() => {})}>
-                Release notes
-              </button>
-              <button onClick={onClose}>Later</button>
-            </div>
-          </>
-        )}
-
-        {state.kind === "downloading" && (
-          <>
-            <p style={{ margin: 0, fontWeight: 600 }}>Downloading v{state.update.version}…</p>
-            <p style={{ color: "var(--text-dim)", fontSize: 13, margin: 0 }}>
-              {fmtBytes(state.received)}{state.total ? ` / ${fmtBytes(state.total)}` : ""}
-            </p>
-            <div style={{ width: "100%", height: 5, background: "var(--bg-elev-2, rgba(255,255,255,0.08))", borderRadius: 3, overflow: "hidden", marginTop: 4 }}>
-              <div style={{
-                width: state.total ? `${Math.min(100, (state.received / state.total) * 100)}%` : "40%",
-                height: "100%",
-                background: "linear-gradient(90deg, #36c5ff, #1b4fd6)",
-                transition: "width 0.2s",
-              }} />
-            </div>
-          </>
-        )}
-
-        {state.kind === "ready" && (
-          <>
-            <p style={{ margin: 0, fontWeight: 600, color: "var(--ok)" }}>
-              v{state.version} downloaded.
-            </p>
-            <p style={{ color: "var(--text-dim)", fontSize: 13, margin: 0 }}>
-              Restart Curvault to finish updating. You can keep working and restart later.
-            </p>
-            <div style={{ display: "flex", gap: "0.5rem", marginTop: "0.5rem" }}>
-              <button className="primary" onClick={onRestart}>Restart now</button>
-              <button onClick={onClose}>Later</button>
-            </div>
-          </>
-        )}
-
-        {state.kind === "error" && (
-          <>
-            <p style={{ margin: 0, fontWeight: 600, color: "var(--error)" }}>Update failed</p>
-            <pre style={{
-              maxHeight: 180, width: "100%", fontSize: 11, whiteSpace: "pre-wrap",
-              textAlign: "left", background: "rgba(0,0,0,0.28)", borderRadius: 6, padding: "0.6rem 0.7rem",
-            }}>
-              {state.message}
-            </pre>
-            <div style={{ display: "flex", gap: "0.5rem", marginTop: "0.5rem" }}>
-              <button onClick={runCheck}>Retry</button>
-              <button className="primary" onClick={onClose}>Close</button>
-            </div>
-          </>
-        )}
-
-        {version && (
-          <div style={{ marginTop: "1rem", color: "var(--text-mute)", fontSize: 11 }}>
-            Curvault · v{version}
+        <div className="updater-stage" {...DRAG}>
+          {/* keyed by kind so the fade replays on state changes only */}
+          <div className="updater-panel updater-fade" key={state.kind} {...DRAG}>
+            {renderPanel(state, { onDownload, onRestart, onClose, runCheck })}
           </div>
-        )}
+        </div>
+
+        {version && <div className="updater-version" {...DRAG}>Curvault · v{version}</div>}
       </div>
     </div>
   );
+}
+
+function renderPanel(
+  state: State,
+  actions: { onDownload: () => void; onRestart: () => void; onClose: () => void; runCheck: () => void },
+) {
+  const DRAG = { "data-tauri-drag-region": true } as const;
+  const noDrag = { onMouseDown: (e: React.MouseEvent) => e.stopPropagation() };
+
+  switch (state.kind) {
+    case "checking":
+      return <p className="updater-sub" {...DRAG}>Checking for updates…</p>;
+
+    case "up-to-date":
+      return (
+        <>
+          <p className="updater-headline" {...DRAG}>You're up to date.</p>
+          <p className="updater-sub" {...DRAG}>v{state.current} is the newest signed release.</p>
+          <div className="updater-actions">
+            <button {...noDrag} onClick={actions.runCheck}>Check again</button>
+            <button className="primary" {...noDrag} onClick={actions.onClose}>Close</button>
+          </div>
+        </>
+      );
+
+    case "available":
+      return (
+        <>
+          <p className="updater-headline" {...DRAG}>Update available · v{state.update.version}</p>
+          <p className="updater-sub" {...DRAG}>
+            You're on v{state.update.currentVersion}.
+            {state.update.date && ` Released ${new Date(state.update.date).toLocaleDateString()}.`}
+          </p>
+          {state.update.body && (
+            <pre className="updater-notes">
+              {state.update.body.slice(0, 1200)}
+              {state.update.body.length > 1200 ? "\n…" : ""}
+            </pre>
+          )}
+          <div className="updater-actions">
+            <button className="primary" {...noDrag} onClick={actions.onDownload}>Download &amp; install</button>
+            <button {...noDrag} onClick={() => openExternal(`${REPO_URL}/releases/tag/v${state.update.version}`).catch(() => {})}>
+              Release notes
+            </button>
+            <button {...noDrag} onClick={actions.onClose}>Later</button>
+          </div>
+        </>
+      );
+
+    case "downloading": {
+      const pct = state.total ? Math.min(100, (state.received / state.total) * 100) : null;
+      return (
+        <>
+          <p className="updater-headline" {...DRAG}>Downloading v{state.update.version}…</p>
+          <p className="updater-sub" {...DRAG}>
+            {fmtBytes(state.received)}{state.total ? ` / ${fmtBytes(state.total)}` : ""}
+          </p>
+          <div className="updater-progress" {...DRAG}>
+            {pct === null ? (
+              <div className="updater-progress-indeterminate" />
+            ) : (
+              <div className="updater-progress-fill" style={{ width: `${pct}%` }} />
+            )}
+          </div>
+        </>
+      );
+    }
+
+    case "ready":
+      return (
+        <>
+          <p className="updater-headline" style={{ color: "var(--ok)" }} {...DRAG}>
+            v{state.version} downloaded.
+          </p>
+          <p className="updater-sub" {...DRAG}>
+            Restart Curvault to finish updating. You can keep working and restart later.
+          </p>
+          <div className="updater-actions">
+            <button className="primary" {...noDrag} onClick={actions.onRestart}>Restart now</button>
+            <button {...noDrag} onClick={actions.onClose}>Later</button>
+          </div>
+        </>
+      );
+
+    case "error":
+      return (
+        <>
+          <p className="updater-headline" style={{ color: "var(--error)" }} {...DRAG}>Update failed</p>
+          <pre className="updater-notes">{state.message}</pre>
+          <div className="updater-actions">
+            <button {...noDrag} onClick={actions.runCheck}>Retry</button>
+            <button className="primary" {...noDrag} onClick={actions.onClose}>Close</button>
+          </div>
+        </>
+      );
+  }
 }

@@ -134,9 +134,12 @@ pub(crate) fn open_updater<R: tauri::Runtime>(app: &tauri::AppHandle<R>) {
     // updater UI from the same bundle.
     let _ = WebviewWindowBuilder::new(app, "updater", WebviewUrl::App("index.html".into()))
         .title("Software Update")
-        .inner_size(480.0, 600.0)
-        .min_inner_size(420.0, 520.0)
+        .inner_size(460.0, 560.0)
         .resizable(false)
+        .decorations(false) // frameless — the webview paints a rounded panel
+        .transparent(true)  // so the rounded corners cut cleanly
+        .shadow(true)
+        .center()
         .build();
 }
 
