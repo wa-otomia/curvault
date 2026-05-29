@@ -40,18 +40,19 @@
 
 body {
   margin: 0;
-  /* The window is configured with transparent:true + macOS vibrancy,
-   * so the body MUST stay fully transparent for the blurred desktop
-   * underneath to show. Tints live on the inner panels instead. */
-  background: transparent;
+  /* Single source of truth for the chrome opacity. Vibrancy from the
+   * platform (macOS hudWindow / Windows mica / Windows acrylic)
+   * contributes the remaining ~10 % of every pixel except where a
+   * .card overlays it. Sidebar and main-frame add only brand-coloured
+   * gradients on top — no extra solid fills — so the chrome reads as
+   * a uniform 90 % tint with the desktop blur subtly bleeding through. */
+  background: rgba(6, 11, 26, 0.90);
   color: var(--text);
   font-feature-settings: "ss01", "cv11";
 }
 
 @supports not (backdrop-filter: blur(1px)) {
-  /* Platforms without backdrop-filter (older Linux desktops, some
-   * Windows revisions) lose vibrancy entirely — fall back to a solid
-   * fill so contrast survives. */
+  /* No backdrop-filter -> no vibrancy. Drop to solid for legibility. */
   body { background: var(--bg); }
 }
 
@@ -169,11 +170,12 @@ pre {
 
 .sidebar {
   width: var(--sidebar-width);
-  /* Translucent brand-blue tint over vibrancy. */
+  /* Just the brand gradients — body already provides the base opacity.
+   * Sidebar reads slightly cooler than main-frame thanks to the deeper
+   * bottom-left blue gradient. */
   background:
     radial-gradient(ellipse at 80% 5%, rgba(54,197,255,0.10) 0%, transparent 50%),
-    radial-gradient(ellipse at 10% 115%, rgba(27,79,214,0.25) 0%, transparent 55%),
-    rgba(14, 21, 48, 0.25);
+    radial-gradient(ellipse at 10% 115%, rgba(27,79,214,0.28) 0%, transparent 55%);
   position: relative;
   border-right: 1px solid rgba(54, 197, 255, 0.10);
   padding: 1rem 0.75rem 0;
@@ -277,8 +279,8 @@ pre {
   display: flex;
   flex-direction: column;
   min-width: 0;
-  /* Just a subtle brand-blue glow — no solid tint, so the macOS
-   * vibrancy reads through clearly. */
+  /* Brand-blue glow on top of the body tint — no solid fill of its own
+   * (body already provides the 90 % opacity). */
   background:
     radial-gradient(ellipse at 80% 0%, rgba(54,197,255,0.10) 0%, transparent 55%);
 }
