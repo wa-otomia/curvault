@@ -120,27 +120,41 @@ fn fixup_path() {
     // exotic, they can add it to the system PATH or restart explorer.exe.
 }
 
-/// Open (or focus) the standalone software-update window. Both the
-/// "Check for Updates…" menu item and the in-app About button route here so
-/// the whole download/restart flow lives in one dedicated window.
-pub(crate) fn open_updater<R: tauri::Runtime>(app: &tauri::AppHandle<R>) {
+/// Open (or focus) a frameless, rounded popup window. The webview branches on
+/// its window label (see main.tsx) to render the matching UI from the same
+/// bundle.
+pub(crate) fn open_popup<R: tauri::Runtime>(
+    app: &tauri::AppHandle<R>,
+    label: &str,
+    title: &str,
+    width: f64,
+    height: f64,
+) {
     use tauri::{Manager, WebviewUrl, WebviewWindowBuilder};
-    if let Some(w) = app.get_webview_window("updater") {
+    if let Some(w) = app.get_webview_window(label) {
         let _ = w.show();
         let _ = w.set_focus();
         return;
     }
-    // The webview branches on its window label (see main.tsx) to render the
-    // updater UI from the same bundle.
-    let _ = WebviewWindowBuilder::new(app, "updater", WebviewUrl::App("index.html".into()))
-        .title("Software Update")
-        .inner_size(460.0, 560.0)
+    let _ = WebviewWindowBuilder::new(app, label, WebviewUrl::App("index.html".into()))
+        .title(title)
+        .inner_size(width, height)
         .resizable(false)
         .decorations(false) // frameless — the webview paints a rounded panel
         .transparent(true)  // so the rounded corners cut cleanly
         .shadow(true)
         .center()
         .build();
+}
+
+/// The standalone software-update window (download/restart flow).
+pub(crate) fn open_updater<R: tauri::Runtime>(app: &tauri::AppHandle<R>) {
+    open_popup(app, "updater", "Software Update", 460.0, 560.0);
+}
+
+/// The standalone About window.
+pub(crate) fn open_about<R: tauri::Runtime>(app: &tauri::AppHandle<R>) {
+    open_popup(app, "about", "About Curvault", 440.0, 560.0);
 }
 
 /// Build the application menu: a custom About + Check-for-Updates pair plus
@@ -201,13 +215,10 @@ pub fn run() {
         .plugin(tauri_plugin_process::init())
         .menu(|handle| build_menu(handle))
         .on_menu_event(|app, event| {
-            use tauri::Emitter;
             match event.id().as_ref() {
-                // Route to the rich in-app About view rather than the bare
-                // native panel.
-                "about" => {
-                    let _ = app.emit("menu://about", ());
-                }
+                // Open the standalone About window rather than the bare native
+                // panel.
+                "about" => open_about(app),
                 "check-update" => open_updater(app),
                 _ => {}
             }
@@ -244,7 +255,9 @@ pub fn run() {
             commands::run_issuance,
             commands::check_for_updates,
             commands::open_updater_window,
+            commands::open_about_window,
             commands::pcsc_event_driven,
+            commands::pcsc_readers,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

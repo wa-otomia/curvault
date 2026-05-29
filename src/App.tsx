@@ -1,5 +1,4 @@
-import { useEffect, useState } from "react";
-import { listen } from "@tauri-apps/api/event";
+import { useState } from "react";
 import Sidebar, { type View } from "./components/Sidebar";
 import StatusBar from "./components/StatusBar";
 import LogPanel from "./components/LogPanel";
@@ -15,17 +14,17 @@ import ProfilesView from "./views/ProfilesView";
 import Fido2View from "./views/Fido2View";
 import IssuanceView from "./views/IssuanceView";
 import StickerView from "./views/StickerView";
-import AboutView from "./views/AboutView";
+import { openAboutWindow } from "./lib/api";
 
 export default function App() {
   const [view, setView] = useState<View>("dashboard");
 
-  // The native "About Curvault" menu item routes here instead of the bare
-  // macOS panel.
-  useEffect(() => {
-    const unlisten = listen("menu://about", () => setView("about"));
-    return () => { unlisten.then((f) => f()); };
-  }, []);
+  // "About" is a standalone popup window now, not an in-app view; the sidebar
+  // entry opens it instead of navigating.
+  const onSelect = (v: View) => {
+    if (v === "about") openAboutWindow().catch(() => {});
+    else setView(v);
+  };
 
   return (
     <>
@@ -37,7 +36,7 @@ export default function App() {
       <div className="titlebar" data-tauri-drag-region></div>
 
       <div className="app-body">
-        <Sidebar current={view} onSelect={setView} />
+        <Sidebar current={view} onSelect={onSelect} />
         <div className="main-frame">
           <div className="content">
             {view === "dashboard" && <Dashboard />}
@@ -52,7 +51,6 @@ export default function App() {
             {view === "fido2" && <Fido2View />}
             {view === "issuance" && <IssuanceView />}
             {view === "sticker" && <StickerView />}
-            {view === "about" && <AboutView />}
           </div>
           <LogPanel />
           <StatusBar />

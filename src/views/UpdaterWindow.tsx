@@ -11,9 +11,6 @@ const REPO_URL = "https://github.com/wa-otomia/curvault";
 
 // Whole window is draggable (frameless); spread onto non-interactive nodes.
 const DRAG = { "data-tauri-drag-region": true } as const;
-// Buttons stop mousedown so a drag never starts on them (belt-and-suspenders
-// in case the runtime matches drag regions by ancestor rather than target).
-const noDrag = { onMouseDown: (e: React.MouseEvent) => e.stopPropagation() };
 
 type State =
   | { kind: "checking" }
@@ -94,7 +91,6 @@ export default function UpdaterWindow() {
   return (
     <div className="updater-root" {...DRAG}>
       <BrandBackdrop opacity={0.5} />
-      <button className="updater-close" {...noDrag} onClick={onClose} title="Close">×</button>
 
       <div className="updater-content" {...DRAG}>
         <div {...DRAG}><BrandLogo size={84} /></div>
@@ -122,7 +118,14 @@ function renderPanel(
 
   switch (state.kind) {
     case "checking":
-      return <p className="updater-sub" {...DRAG}>Checking for updates…</p>;
+      return (
+        <>
+          <p className="updater-sub" {...DRAG}>Checking for updates…</p>
+          <div className="updater-actions">
+            <button {...noDrag} onClick={actions.onClose}>Close</button>
+          </div>
+        </>
+      );
 
     case "up-to-date":
       return (
@@ -174,6 +177,9 @@ function renderPanel(
             ) : (
               <div className="updater-progress-fill" style={{ width: `${pct}%` }} />
             )}
+          </div>
+          <div className="updater-actions">
+            <button {...noDrag} onClick={actions.onClose}>Close</button>
           </div>
         </>
       );

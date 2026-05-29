@@ -1,8 +1,8 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "updater-window",
-  "description": "Capabilities for the standalone software-update window.",
-  "windows": ["updater"],
+  "description": "Capabilities for the standalone frameless popup windows (updater, about).",
+  "windows": ["updater", "about"],
   "permissions": [
     "core:default",
     "core:app:allow-version",

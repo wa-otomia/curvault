@@ -681,6 +681,17 @@ th {
   font-size: 11px;
 }
 
+.about-meta {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 1.1rem;
+  margin: 0.5rem 0 0.2rem;
+  font-size: 13px;
+  color: var(--text-dim);
+}
+.about-meta b { color: var(--text); font-weight: 600; }
+
 .updater-actions {
   display: flex;
   gap: 0.5rem;

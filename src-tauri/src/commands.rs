@@ -189,9 +189,22 @@ pub fn open_updater_window(app: tauri::AppHandle) {
     crate::open_updater(&app);
 }
 
+/// Open (or focus) the standalone About window.
+#[tauri::command]
+pub fn open_about_window(app: tauri::AppHandle) {
+    crate::open_about(&app);
+}
+
 /// Whether the native PC/SC event monitor is running. When true the frontend
-/// reacts to `pcsc://changed` events instead of polling.
+/// reacts to `pcsc://readers` events instead of polling.
 #[tauri::command]
 pub fn pcsc_event_driven() -> bool {
     crate::services::cardmon::is_active()
+}
+
+/// The monitor's latest reader snapshot (cached PC/SC state — never powers a
+/// card). None until the first change or if the monitor isn't running.
+#[tauri::command]
+pub fn pcsc_readers() -> Option<Vec<crate::services::cardmon::ReaderSnapshot>> {
+    crate::services::cardmon::last_snapshot()
 }

@@ -24,7 +24,7 @@ export default function StatusBar() {
           </>
         )}
       </span>
-      <span>Curvault · v0.1.29</span>
+      <span>Curvault · v0.1.30</span>
     </div>
   );
 }

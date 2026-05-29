@@ -2,11 +2,12 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App";
 import UpdaterWindow from "./views/UpdaterWindow";
+import AboutWindow from "./views/AboutWindow";
 import { CardWatchProvider } from "./lib/cardWatch";
 import "./index.css";
 
-// The same bundle serves both windows; the "updater" window renders the
-// standalone software-update UI instead of the full app shell.
+// The same bundle serves every window; secondary windows render their own
+// standalone UI (by window label) instead of the full app shell.
 function currentLabel(): string {
   try {
     // Read synchronously from Tauri internals; no IPC, no permission needed.
@@ -19,16 +20,23 @@ function currentLabel(): string {
   }
 }
 
-const isUpdater = currentLabel() === "updater";
+function Root() {
+  switch (currentLabel()) {
+    case "updater":
+      return <UpdaterWindow />;
+    case "about":
+      return <AboutWindow />;
+    default:
+      return (
+        <CardWatchProvider>
+          <App />
+        </CardWatchProvider>
+      );
+  }
+}
 
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
   <React.StrictMode>
-    {isUpdater ? (
-      <UpdaterWindow />
-    ) : (
-      <CardWatchProvider>
-        <App />
-      </CardWatchProvider>
-    )}
+    <Root />
   </React.StrictMode>,
 );

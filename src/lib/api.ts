@@ -125,10 +125,19 @@ export const checkForUpdates = (): Promise<UpdateInfo> =>
 export const openUpdaterWindow = (): Promise<void> =>
   invoke("open_updater_window");
 
+/** Open (or focus) the standalone About window. */
+export const openAboutWindow = (): Promise<void> =>
+  invoke("open_about_window");
+
 /** Whether native PC/SC event monitoring is active (frontend then reacts to
- *  `pcsc://changed` events instead of polling). */
+ *  `pcsc://readers` events instead of polling). */
 export const pcscEventDriven = (): Promise<boolean> =>
   invoke("pcsc_event_driven");
+
+/** The monitor's latest cached reader snapshot — never powers a card. Null
+ *  until the first change or if the monitor isn't running. */
+export const pcscReaders = (): Promise<Reader[] | null> =>
+  invoke("pcsc_readers");
 
 // ---------- Events ----------
 
