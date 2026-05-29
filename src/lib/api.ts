@@ -99,6 +99,20 @@ export const runIssuance = (
 ): Promise<IssuanceReport> =>
   invoke("run_issuance", { reader, profileId, subjectVars });
 
+// ---------- Updates ----------
+
+export interface UpdateInfo {
+  currentVersion: string;
+  latestVersion: string;
+  isOutdated: boolean;
+  releaseUrl: string;
+  releaseNotes: string;
+  publishedAt: string | null;
+}
+
+export const checkForUpdates = (): Promise<UpdateInfo> =>
+  invoke("check_for_updates");
+
 // ---------- Events ----------
 
 export interface CommandLogEntry {

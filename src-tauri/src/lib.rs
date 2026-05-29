@@ -153,6 +153,7 @@ pub fn run() {
             commands::fido2_set_pin,
             commands::fido2_reset,
             commands::run_issuance,
+            commands::check_for_updates,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

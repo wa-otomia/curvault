@@ -6,6 +6,7 @@ pub mod profile;
 pub mod issuance;
 pub mod pkcs15;
 pub mod fido2;
+pub mod updates;
 
 use std::collections::HashMap;
 use std::sync::{Mutex, OnceLock};

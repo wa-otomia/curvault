@@ -1,6 +1,6 @@
 [package]
 name = "curvault"
-version = "0.1.14"
+version = "0.1.15"
 description = "Curvault — desktop card-issuance workstation for IsoApplet / JavaCard / FIDO2."
 authors = ["wa-otomia"]
 edition = "2021"
@@ -31,6 +31,7 @@ rand = "0.8"
 hex = "0.4"
 regex = "1"
 tokio = { version = "1", features = ["process", "io-util", "macros", "sync"] }
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
 
 [profile.release]
 codegen-units = 1

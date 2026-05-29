@@ -1,6 +1,6 @@
 //! Tauri command surface. All `invoke()` calls from the renderer enter here.
 
-use crate::services::{gp, opensc, pcsc, profile, vault, issuance, pkcs15, fido2};
+use crate::services::{gp, opensc, pcsc, profile, vault, issuance, pkcs15, fido2, updates};
 use crate::services::Result;
 use serde::Deserialize;
 use std::collections::HashMap;
@@ -168,4 +168,11 @@ pub async fn run_issuance(
     subject_vars: HashMap<String, String>,
 ) -> Result<issuance::IssuanceReport> {
     issuance::run(&reader, &profile_id, subject_vars).await
+}
+
+// ---------- Updates ----------
+
+#[tauri::command]
+pub async fn check_for_updates() -> Result<updates::UpdateInfo> {
+    updates::check().await
 }
