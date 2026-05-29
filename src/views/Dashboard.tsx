@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { listReaders, listProfiles, listGpKeys } from "../lib/api";
 import type { Reader, Profile, GpKeyHandle } from "../types";
 import LoadingOverlay from "../components/LoadingOverlay";
+import { useCardChange } from "../lib/cardWatch";
 
 export default function Dashboard() {
   const [readers, setReaders] = useState<Reader[]>([]);
@@ -10,17 +11,25 @@ export default function Dashboard() {
   const [busy, setBusy] = useState(true);
   const [err, setErr] = useState<string | null>(null);
 
-  useEffect(() => {
+  const load = () => {
     setBusy(true);
     Promise.all([listReaders(), listProfiles(), listGpKeys()])
       .then(([r, p, k]) => {
         setReaders(r);
         setProfiles(p);
         setKeys(k);
+        setErr(null);
       })
       .catch((e) => setErr(String(e)))
       .finally(() => setBusy(false));
+  };
+
+  useEffect(() => {
+    load();
   }, []);
+
+  // Keep the overview live as cards come and go.
+  useCardChange(load);
 
   if (err) {
     return (

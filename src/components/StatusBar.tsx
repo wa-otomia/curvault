@@ -1,55 +1,30 @@
-import { useEffect, useState } from "react";
-import { listReadersQuiet } from "../lib/api";
+import { useCardWatch } from "../lib/cardWatch";
 
-// The status bar polls every few seconds so the reader / card counts
-// stay in sync with what's physically plugged in. It uses the *quiet*
-// reader listing, which skips ATR reads and does NOT emit command-log
-// entries — so the poll never floods the bottom panel.
-const POLL_MS = 3000;
-
+// The status bar reflects the shared card-presence watcher (see
+// lib/cardWatch). It does not poll on its own — there is a single PC/SC
+// poll for the whole app, and card-data views react to the same signal.
 export default function StatusBar() {
-  const [readerCount, setReaderCount] = useState<number | null>(null);
-  const [cardCount, setCardCount] = useState<number | null>(null);
-  const [err, setErr] = useState<string | null>(null);
-
-  useEffect(() => {
-    let alive = true;
-    const refresh = async () => {
-      try {
-        const readers = await listReadersQuiet();
-        if (!alive) return;
-        setReaderCount(readers.length);
-        setCardCount(readers.filter((r) => r.hasCard).length);
-        setErr(null);
-      } catch (e: unknown) {
-        if (alive) setErr(String(e));
-      }
-    };
-    refresh();
-    const t = setInterval(refresh, POLL_MS);
-    return () => {
-      alive = false;
-      clearInterval(t);
-    };
-  }, []);
+  const { readers, cardPresent, ready, error } = useCardWatch();
+  const readerCount = readers.length;
+  const cardCount = readers.filter((r) => r.hasCard).length;
 
   return (
     <div className="statusbar">
       <span>
-        {err ? (
+        {error ? (
           <>
             <span className="dot error" />
-            {err}
+            {error}
           </>
         ) : (
           <>
-            <span className={`dot ${(cardCount ?? 0) > 0 ? "ok" : "warn"}`} />
-            {readerCount ?? "—"} reader{readerCount === 1 ? "" : "s"},{" "}
-            {cardCount ?? "—"} card{cardCount === 1 ? "" : "s"} present
+            <span className={`dot ${cardPresent ? "ok" : "warn"}`} />
+            {ready ? readerCount : "—"} reader{readerCount === 1 ? "" : "s"},{" "}
+            {ready ? cardCount : "—"} card{cardCount === 1 ? "" : "s"} present
           </>
         )}
       </span>
-      <span>Curvault · v0.1.22</span>
+      <span>Curvault · v0.1.23</span>
     </div>
   );
 }

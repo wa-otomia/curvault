@@ -4,6 +4,7 @@ import { listReaders, listGpKeys, installApplet, uninstallApplet } from "../lib/
 import type { Reader, GpKeyHandle, CommandResult } from "../types";
 import LoadingOverlay from "../components/LoadingOverlay";
 import { confirmAction } from "../lib/dialog";
+import { useCardChange } from "../lib/cardWatch";
 
 // Known AID hints — shown next to user-typed AIDs. Add new ones here as
 // they come up. Match is by-prefix so children (instance AIDs) inherit
@@ -54,6 +55,18 @@ export default function AppletInstallerView() {
       .finally(() => setBusy(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Keep the reader / key pickers in sync with what is plugged in. Form
+  // fields (CAP path, AIDs) are intentionally left untouched.
+  useCardChange(() => {
+    Promise.all([listReaders(), listGpKeys()])
+      .then(([r, k]) => {
+        setReaders(r);
+        setKeys(k);
+        if (!reader && r.length) setReader(r[0].name);
+      })
+      .catch((e) => setErr(String(e)));
+  });
 
   const pickCap = async () => {
     const selected = await open({

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { listReaders, pkcs15Create } from "../lib/api";
 import type { Reader, Pkcs15InitResult } from "../types";
 import LoadingOverlay from "../components/LoadingOverlay";
+import { useCardChange } from "../lib/cardWatch";
 
 function randomHex(bytes: number): string {
   const arr = new Uint8Array(bytes);
@@ -40,6 +41,17 @@ export default function Pkcs15View() {
       })
       .finally(() => setBusy(false));
   }, []);
+
+  // Track the reader picker as cards come and go (form fields untouched).
+  useCardChange(() => {
+    listReaders()
+      .then((r) => {
+        setReaders(r);
+        const first = r.find((x) => x.hasCard);
+        if (first) setReader(first.name);
+      })
+      .catch((e) => setErr(String(e)));
+  });
 
   const valid = useMemo(() => {
     if (!reader || !label || !serial) return false;

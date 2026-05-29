@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { pkcs11Dump } from "../lib/api";
 import LoadingOverlay from "../components/LoadingOverlay";
+import { useCardChange } from "../lib/cardWatch";
 
 export default function Pkcs11ObjectsView() {
   const [module, setModule] = useState("");
@@ -20,6 +21,12 @@ export default function Pkcs11ObjectsView() {
       setBusy(false);
     }
   };
+
+  // If a listing is already on screen, refresh it when a card comes or goes
+  // (don't trigger an unsolicited dump when nothing is shown yet).
+  useCardChange(() => {
+    if (dump || err) refresh();
+  });
 
   return (
     <>

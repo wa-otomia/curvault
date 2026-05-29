@@ -3,6 +3,7 @@ import { listGpKeys, generateGpKey, deleteGpKey, listReaders, lockGpKey } from "
 import type { GpKeyHandle, Reader } from "../types";
 import LoadingOverlay from "../components/LoadingOverlay";
 import { confirmAction } from "../lib/dialog";
+import { useCardChange } from "../lib/cardWatch";
 
 export default function GpKeysView() {
   const [keys, setKeys] = useState<GpKeyHandle[]>([]);
@@ -29,6 +30,9 @@ export default function GpKeysView() {
   useEffect(() => {
     refresh();
   }, []);
+
+  // The reader list (lock-card target) tracks card presence.
+  useCardChange(refresh);
 
   const onGenerate = async () => {
     setBusy(true);

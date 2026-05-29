@@ -18,6 +18,7 @@ import type { Reader, CardInfo, Applet, GpKeyHandle } from "../types";
 import LoadingOverlay from "../components/LoadingOverlay";
 import { aidName, isProtectedAid } from "../lib/aids";
 import { confirmAction } from "../lib/dialog";
+import { useCardChange } from "../lib/cardWatch";
 
 function tagColor(kind: Applet["kind"]): { bg: string; fg: string; label: string } {
   switch (kind) {
@@ -83,6 +84,24 @@ export default function AppletsView() {
     if (reader) refreshCard(reader);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [reader]);
+
+  // On any card insert/remove, re-list readers and re-pick a card-bearing
+  // one; re-inspect it (or clear the listing if the card is gone).
+  useCardChange(() => {
+    Promise.all([listReaders(), listGpKeys()])
+      .then(([rs, ks]) => {
+        setReaders(rs);
+        setKeys(ks);
+        const withCard = rs.find((r) => r.hasCard);
+        if (withCard) {
+          if (withCard.name === reader) refreshCard(withCard.name);
+          else setReader(withCard.name); // [reader] effect inspects
+        } else {
+          setCard(null);
+        }
+      })
+      .catch((e) => setErr(String(e)));
+  });
 
   const onDelete = async (a: Applet) => {
     if (!reader) return;

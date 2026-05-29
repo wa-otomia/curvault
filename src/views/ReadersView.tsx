@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { listReaders, inspectCard } from "../lib/api";
 import type { Reader, CardInfo } from "../types";
 import LoadingOverlay from "../components/LoadingOverlay";
+import { useCardChange, useCardWatch } from "../lib/cardWatch";
 
 export default function ReadersView() {
   const [readers, setReaders] = useState<Reader[]>([]);
@@ -9,6 +10,7 @@ export default function ReadersView() {
   const [card, setCard] = useState<CardInfo | null>(null);
   const [busy, setBusy] = useState(true);
   const [err, setErr] = useState<string | null>(null);
+  const { readers: liveReaders } = useCardWatch();
 
   const refresh = async () => {
     setBusy(true);
@@ -25,6 +27,20 @@ export default function ReadersView() {
   useEffect(() => {
     refresh();
   }, []);
+
+  // Re-list on any insert/remove; re-inspect the open card if it is still
+  // present, otherwise drop the now-stale card panel.
+  useCardChange(() => {
+    refresh();
+    if (selected) {
+      const stillPresent = liveReaders.find((r) => r.name === selected)?.hasCard;
+      if (stillPresent) inspect(selected);
+      else {
+        setCard(null);
+        setErr(null);
+      }
+    }
+  });
 
   const inspect = async (reader: string) => {
     setSelected(reader);

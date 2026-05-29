@@ -10,6 +10,7 @@ import {
 import type { Fido2Device, Fido2Info, ResidentCredential } from "../types";
 import LoadingOverlay from "../components/LoadingOverlay";
 import { confirmAction } from "../lib/dialog";
+import { useCardChange } from "../lib/cardWatch";
 
 /**
  * libfido2 prints the user id as base64. Most RPs encode a readable
@@ -68,6 +69,26 @@ export default function Fido2View() {
   useEffect(() => {
     refreshDevices();
   }, []);
+
+  // A CTAP card tapped on / lifted off the reader changes the device list.
+  // Re-enumerate on presence changes, but never interrupt an in-flight
+  // operation (PIN change, listing, reset). Drop the selection if the
+  // selected device disappeared.
+  useCardChange(async () => {
+    if (busy) return;
+    setErr(null);
+    try {
+      const list = await fido2ListDevices();
+      setDevices(list);
+      if (selected && !list.some((d) => d.path === selected.path)) {
+        setSelected(null);
+        setInfo(null);
+        setCreds(null);
+      }
+    } catch (e: unknown) {
+      setErr(String(e));
+    }
+  });
 
   const onSelect = async (d: Fido2Device) => {
     setSelected(d);

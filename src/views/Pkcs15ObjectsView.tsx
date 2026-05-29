@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { listReaders, pkcs15Dump } from "../lib/api";
 import type { Reader } from "../types";
 import LoadingOverlay from "../components/LoadingOverlay";
+import { useCardChange } from "../lib/cardWatch";
 
 interface Section {
   name: string;
@@ -47,12 +48,12 @@ export default function Pkcs15ObjectsView() {
       .finally(() => setBusy(false));
   }, []);
 
-  const refresh = async () => {
-    if (!reader) return;
+  const refresh = async (r = reader) => {
+    if (!r) return;
     setBusy(true);
     setErr(null);
     try {
-      setDump(await pkcs15Dump(reader));
+      setDump(await pkcs15Dump(r));
     } catch (e: unknown) {
       setErr(String(e));
       setDump("");
@@ -60,6 +61,25 @@ export default function Pkcs15ObjectsView() {
       setBusy(false);
     }
   };
+
+  // On insert/remove: re-pick the card-bearing reader. If a dump is already
+  // on screen, re-dump the new card; if the card is gone, clear it.
+  useCardChange(() => {
+    listReaders()
+      .then((rs) => {
+        setReaders(rs);
+        const r = rs.find((x) => x.hasCard);
+        if (r) {
+          setReader(r.name);
+          if (dump) refresh(r.name);
+        } else {
+          setReader("");
+          setDump("");
+          setErr(null);
+        }
+      })
+      .catch((e) => setErr(String(e)));
+  });
 
   const sections = dump ? splitSections(dump) : [];
 
@@ -83,7 +103,7 @@ export default function Pkcs15ObjectsView() {
               ))}
             </select>
           </div>
-          <button className="primary" disabled={!reader || busy} onClick={refresh}>
+          <button className="primary" disabled={!reader || busy} onClick={() => refresh()}>
             {busy ? "Reading…" : "Dump PKCS#15"}
           </button>
         </div>
