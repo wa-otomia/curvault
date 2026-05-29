@@ -11,6 +11,16 @@ fn map_fido_error(stderr: &str) -> Option<String> {
     if stderr.contains("FIDO_ERR_NO_CREDENTIALS") {
         return Some("No resident credentials on this device.".into());
     }
+    if stderr.contains("FIDO_ERR_PIN_REQUIRED") {
+        // Credential management (CTAP2.1 credMgmt) needs a pinUvAuthToken,
+        // which only exists once a PIN is set. A blank authenticator simply
+        // has nothing to manage — surface that as guidance, not a failure.
+        return Some(
+            "This authenticator requires a PIN before its resident credentials \
+             can be listed or managed. Set a PIN first, or enter the existing PIN."
+                .into(),
+        );
+    }
     None
 }
 

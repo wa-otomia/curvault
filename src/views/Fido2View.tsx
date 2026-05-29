@@ -91,10 +91,23 @@ export default function Fido2View() {
     // close stdin instead of feeding a blank PIN.
     setBusy(true);
     setErr(null);
+    setNotice(null);
     try {
       setCreds(await fido2ListCredentials(selected.path, pin));
     } catch (e: unknown) {
-      setErr(String(e));
+      const msg = String(e);
+      // A PIN-less authenticator can't enumerate via credMgmt — that's a
+      // benign "set a PIN first" situation, not a hard error.
+      if (/PIN_REQUIRED|requires a PIN/i.test(msg)) {
+        setCreds([]);
+        setNotice(
+          pin
+            ? "The authenticator rejected the listing — check the PIN and try again."
+            : "This authenticator has no PIN set, so it has no resident credentials to list. Set a PIN above first if you intend to store any.",
+        );
+      } else {
+        setErr(msg);
+      }
     } finally {
       setBusy(false);
     }
@@ -160,11 +173,25 @@ export default function Fido2View() {
       { title: "Factory reset authenticator", danger: true, okLabel: "Factory reset" },
     ))) return;
     setBusy(true);
+    setErr(null);
     try {
       await fido2Reset(selected.path);
-      setNotice("Reset issued. Authenticator should be blank.");
+      setNotice("Reset issued. The authenticator is now blank (no PIN, no credentials).");
+      // Clear everything we cached for this device.
       setCreds(null);
-      setInfo(null);
+      setPin("");
+      setPinFormOpen(false);
+      setOldPin(""); setNewPin(""); setNewPin2("");
+      // Re-read the live state so the panel reflects the post-reset device
+      // instead of leaving stale info on screen.
+      setDevices(await fido2ListDevices());
+      try {
+        setInfo(await fido2Info(selected.path));
+      } catch {
+        // NFC tokens often drop off the reader right after a reset and need
+        // a re-tap — don't turn that into a scary error; the reset worked.
+        setInfo(null);
+      }
     } catch (e: unknown) {
       setErr(String(e));
     } finally {
@@ -315,8 +342,9 @@ export default function Fido2View() {
             <button onClick={onListCreds} disabled={busy}>List credentials</button>
           </div>
           <small style={{ color: "var(--text-dim)", fontSize: 11, marginBottom: "0.75rem", display: "block" }}>
-            This authenticator reports <code>noclientPin</code> when no PIN is set — leave
-            the field blank and it will enumerate without PIN auth.
+            Leave the field blank if the authenticator has no PIN. Many authenticators
+            still require a PIN to enumerate resident credentials (CTAP credential
+            management needs PIN/UV auth) — if so, you'll be prompted to set or enter one.
           </small>
           {creds === null ? (
             <div className="empty">Click "List credentials" (enter the PIN first if the device has one).</div>
