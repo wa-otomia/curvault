@@ -16,16 +16,19 @@ export default function AppletInstallerView() {
   const [pkgAid, setPkgAid] = useState(ISOAPPLET_PKG);
   const [appletAid, setAppletAid] = useState(ISOAPPLET_APP);
   const [instanceAid, setInstanceAid] = useState("");
-  const [busy, setBusy] = useState(false);
+  const [busy, setBusy] = useState(true);
   const [result, setResult] = useState<CommandResult | null>(null);
   const [err, setErr] = useState<string | null>(null);
 
   useEffect(() => {
-    Promise.all([listReaders(), listGpKeys()]).then(([r, k]) => {
-      setReaders(r);
-      setKeys(k);
-      if (!reader && r.length) setReader(r[0].name);
-    });
+    setBusy(true);
+    Promise.all([listReaders(), listGpKeys()])
+      .then(([r, k]) => {
+        setReaders(r);
+        setKeys(k);
+        if (!reader && r.length) setReader(r[0].name);
+      })
+      .finally(() => setBusy(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

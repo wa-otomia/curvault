@@ -22,10 +22,13 @@ export default function Fido2View() {
 
   const refreshDevices = async () => {
     setErr(null);
+    setBusy(true);
     try {
       setDevices(await fido2ListDevices());
     } catch (e: unknown) {
       setErr(String(e));
+    } finally {
+      setBusy(false);
     }
   };
 

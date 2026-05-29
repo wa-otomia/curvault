@@ -1,6 +1,6 @@
 [package]
 name = "curvault"
-version = "0.1.9"
+version = "0.1.10"
 description = "Curvault — desktop card-issuance workstation for IsoApplet / JavaCard / FIDO2."
 authors = ["wa-otomia"]
 edition = "2021"
@@ -14,7 +14,7 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
-tauri = { version = "2", features = [] }
+tauri = { version = "2", features = ["macos-private-api"] }
 tauri-plugin-dialog = "2"
 tauri-plugin-shell = "2"
 tauri-plugin-store = "2"

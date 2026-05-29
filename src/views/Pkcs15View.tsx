@@ -26,16 +26,19 @@ export default function Pkcs15View() {
   const [pin, setPin] = useState(() => randomPin(8));
   const [puk, setPuk] = useState(() => randomHex(8));   // 16 hex chars
 
-  const [busy, setBusy] = useState(false);
+  const [busy, setBusy] = useState(true);
   const [result, setResult] = useState<Pkcs15InitResult | null>(null);
   const [err, setErr] = useState<string | null>(null);
 
   useEffect(() => {
-    listReaders().then((r) => {
-      setReaders(r);
-      const first = r.find((x) => x.hasCard);
-      if (first) setReader(first.name);
-    });
+    setBusy(true);
+    listReaders()
+      .then((r) => {
+        setReaders(r);
+        const first = r.find((x) => x.hasCard);
+        if (first) setReader(first.name);
+      })
+      .finally(() => setBusy(false));
   }, []);
 
   const valid = useMemo(() => {

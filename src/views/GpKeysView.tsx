@@ -12,6 +12,7 @@ export default function GpKeysView() {
   const [info, setInfo] = useState<string | null>(null);
 
   const refresh = async () => {
+    setBusy(true);
     try {
       const [k, r] = await Promise.all([listGpKeys(), listReaders()]);
       setKeys(k);
@@ -19,6 +20,8 @@ export default function GpKeysView() {
       setErr(null);
     } catch (e: unknown) {
       setErr(String(e));
+    } finally {
+      setBusy(false);
     }
   };
 

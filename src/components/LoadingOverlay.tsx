@@ -1,20 +1,46 @@
 // Full-content-area overlay that locks interaction while a view loads.
-// The spinner is the Curvault C-mark broken into three layers that spin at
-// different speeds in opposite directions, with the center dot pulsing.
+// The spinner is the Curvault C-mark broken into three layers that spin
+// at different speeds in opposite directions, with the centre dot pulsing.
 //
-// Drop this at the top of any view's return JSX; pass `show={busy}` —
-// while show is true the overlay covers .content, blurs it, and steals
-// pointer events.
+// The overlay is rendered with `position: fixed` so a long, scrolling
+// page never lets the bottom slip out from under it. It animates both in
+// and out (the component stays mounted for the fade-out, then unmounts).
+
+import { useEffect, useState } from "react";
 
 interface LoadingOverlayProps {
   show: boolean;
   label?: string;
 }
 
+const EXIT_MS = 200;
+
 export default function LoadingOverlay({ show, label }: LoadingOverlayProps) {
-  if (!show) return null;
+  const [mounted, setMounted] = useState(show);
+  const [exiting, setExiting] = useState(false);
+
+  useEffect(() => {
+    if (show) {
+      setMounted(true);
+      setExiting(false);
+    } else if (mounted) {
+      setExiting(true);
+      const timer = setTimeout(() => {
+        setMounted(false);
+        setExiting(false);
+      }, EXIT_MS);
+      return () => clearTimeout(timer);
+    }
+  }, [show, mounted]);
+
+  if (!mounted) return null;
+
   return (
-    <div className="loading-overlay" aria-busy="true" aria-live="polite">
+    <div
+      className={`loading-overlay ${exiting ? "loading-overlay-exit" : ""}`}
+      aria-busy="true"
+      aria-live="polite"
+    >
       <div className="loading-stack">
         <svg
           className="loading-spinner"
@@ -53,7 +79,7 @@ export default function LoadingOverlay({ show, label }: LoadingOverlayProps) {
             />
           </g>
 
-          {/* Center dot: pulse */}
+          {/* Centre dot: pulse */}
           <g className="loading-dot">
             <circle cx="60" cy="60" r="6.5" fill="#fff" />
           </g>

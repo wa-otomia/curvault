@@ -32,15 +32,19 @@ export default function Pkcs15ObjectsView() {
   const [readers, setReaders] = useState<Reader[]>([]);
   const [reader, setReader] = useState("");
   const [dump, setDump] = useState("");
-  const [busy, setBusy] = useState(false);
+  const [busy, setBusy] = useState(true);
   const [err, setErr] = useState<string | null>(null);
 
   useEffect(() => {
-    listReaders().then((rs) => {
-      setReaders(rs);
-      const r = rs.find((r) => r.hasCard);
-      if (r) setReader(r.name);
-    }).catch((e) => setErr(String(e)));
+    setBusy(true);
+    listReaders()
+      .then((rs) => {
+        setReaders(rs);
+        const r = rs.find((r) => r.hasCard);
+        if (r) setReader(r.name);
+      })
+      .catch((e) => setErr(String(e)))
+      .finally(() => setBusy(false));
   }, []);
 
   const refresh = async () => {

@@ -16,16 +16,19 @@ export default function IssuanceView() {
   const [email, setEmail] = useState("");
   const [empId, setEmpId] = useState("");
   const [report, setReport] = useState<IssuanceReport | null>(null);
-  const [busy, setBusy] = useState(false);
+  const [busy, setBusy] = useState(true);
   const [err, setErr] = useState<string | null>(null);
 
   useEffect(() => {
-    Promise.all([listReaders(), listProfiles()]).then(([r, p]) => {
-      setReaders(r);
-      setProfiles(p);
-      if (r.length) setReader(r[0].name);
-      if (p.length) setProfileId(p[0].id);
-    });
+    setBusy(true);
+    Promise.all([listReaders(), listProfiles()])
+      .then(([r, p]) => {
+        setReaders(r);
+        setProfiles(p);
+        if (r.length) setReader(r[0].name);
+        if (p.length) setProfileId(p[0].id);
+      })
+      .finally(() => setBusy(false));
     let unsub = () => {};
     onIssuanceProgress((r) => setReport(r)).then((u) => { unsub = u; });
     return () => unsub();

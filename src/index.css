@@ -3,6 +3,11 @@
   font-size: 14px;
   color-scheme: dark;
 
+  /* Shared layout metrics. Used by the chrome (sidebar, titlebar) and by
+   * the fixed-position loading overlay so they stay in sync. */
+  --sidebar-width: 240px;
+  --titlebar-height: 30px;
+
   /* Curvault palette: deep navy base + brand cyan-blue gradient. */
   --bg:           #060b1a;
   --bg-elev:      #0e1530;
@@ -57,8 +62,8 @@ body {
 }
 
 .titlebar {
-  flex: 0 0 30px;
-  height: 30px;
+  flex: 0 0 var(--titlebar-height);
+  height: var(--titlebar-height);
   display: flex;
   align-items: center;
   /* Reserve room on the left for macOS traffic lights (3 dots, ~74px wide). */
@@ -163,7 +168,7 @@ pre {
 /* -------- sidebar -------- */
 
 .sidebar {
-  width: 240px;
+  width: var(--sidebar-width);
   /* Translucent brand-blue tint over vibrancy. */
   background:
     radial-gradient(ellipse at 80% 5%, rgba(54,197,255,0.10) 0%, transparent 50%),
@@ -403,16 +408,28 @@ th {
 /* -------- loading overlay -------- */
 
 .loading-overlay {
-  position: absolute;
-  inset: 0;
-  background: rgba(6, 11, 26, 0.62);
-  -webkit-backdrop-filter: blur(3px);
-  backdrop-filter: blur(3px);
+  /* Fixed positioning so a scrolling page can't slip out from under it.
+   * Anchored to the area right of the sidebar and below the titlebar so
+   * the navigation stays interactive — clicking another nav item while
+   * a load is running unmounts the overlay along with the view. */
+  position: fixed;
+  top: var(--titlebar-height);
+  left: var(--sidebar-width);
+  right: 0;
+  bottom: 0;
+  background: rgba(6, 11, 26, 0.55);
+  -webkit-backdrop-filter: blur(4px);
+  backdrop-filter: blur(4px);
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 100;
   animation: curvault-fade-in 0.18s ease-out;
+}
+
+.loading-overlay.loading-overlay-exit {
+  animation: curvault-fade-out 0.18s ease-in forwards;
+  pointer-events: none;
 }
 
 .loading-stack {
@@ -474,6 +491,23 @@ th {
 @keyframes curvault-fade-in {
   from { opacity: 0; }
   to   { opacity: 1; }
+}
+
+@keyframes curvault-fade-out {
+  from { opacity: 1; }
+  to   { opacity: 0; }
+}
+
+/* Page transition: every direct child of .content (i.e. the active
+ * view) fades in on mount. The loading overlay is excluded so its own
+ * fade-in / fade-out lifecycle stays predictable. */
+.content > *:not(.loading-overlay) {
+  animation: curvault-page-in 0.22s ease-out;
+}
+
+@keyframes curvault-page-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
 }
 
 /* -------- log panel -------- */

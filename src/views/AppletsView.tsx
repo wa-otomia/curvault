@@ -33,11 +33,15 @@ export default function AppletsView() {
   const [err, setErr] = useState<string | null>(null);
 
   useEffect(() => {
-    listReaders().then((rs) => {
-      setReaders(rs);
-      const r = rs.find((r) => r.hasCard);
-      if (r) setReader(r.name);
-    }).catch((e) => setErr(String(e)));
+    setBusy(true);
+    listReaders()
+      .then((rs) => {
+        setReaders(rs);
+        const r = rs.find((r) => r.hasCard);
+        if (r) setReader(r.name);
+        else setBusy(false); // no card → no inspect → done
+      })
+      .catch((e) => { setErr(String(e)); setBusy(false); });
   }, []);
 
   useEffect(() => {
