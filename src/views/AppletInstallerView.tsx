@@ -96,21 +96,23 @@ export default function AppletInstallerView() {
   };
 
   const onUninstall = async () => {
-    // gp --uninstall accepts either a package AID or a CAP file path.
-    // Prefer the AID when typed; otherwise hand gp the CAP file so the
-    // user can pick what to remove via Browse instead of copying the AID.
-    const target = pkgAid.trim() || capPath.trim();
-    if (!target) return;
-    const targetLabel = pkgAid.trim() ? `package ${pkgAid.trim()}` : `package from ${capPath}`;
+    // Deletion is by AID (gp --delete). A package AID is required — a CAP
+    // path can't be deleted by AID.
+    const target = pkgAid.trim();
+    if (!target) {
+      setErr("Enter the package AID to uninstall.");
+      return;
+    }
     if (!(await confirmAction(
-      `Uninstall ${targetLabel} from card on ${reader}?\n\nThis removes ALL applets in that package and all their data.`,
+      `Uninstall package ${target} from card on ${reader}?\n\nThis removes ALL applets in that package and all their data.`,
       { title: "Uninstall package", danger: true, okLabel: "Uninstall" },
     ))) return;
     setBusy(true);
     setErr(null);
     setResult(null);
     try {
-      const r = await uninstallApplet(reader, gpKeyId || null, target);
+      // A package — cascade its instances with --force.
+      const r = await uninstallApplet(reader, gpKeyId || null, target, true);
       setResult(r);
     } catch (e: unknown) {
       setErr(String(e));
@@ -213,14 +215,12 @@ export default function AppletInstallerView() {
           </button>
           <button
             className="danger"
-            disabled={busy || !reader || (!pkgAid.trim() && !capPath.trim())}
+            disabled={busy || !reader || !pkgAid.trim()}
             onClick={onUninstall}
             title={
-              !pkgAid.trim() && !capPath.trim()
-                ? "Enter a Package AID or pick a CAP file"
-                : pkgAid.trim()
-                ? `gp --uninstall ${pkgAid.trim()}`
-                : `gp --uninstall ${capPath}  (reads AID from CAP)`
+              !pkgAid.trim()
+                ? "Enter a Package AID to uninstall"
+                : `gp --delete ${pkgAid.trim()} --force`
             }
           >
             Uninstall package

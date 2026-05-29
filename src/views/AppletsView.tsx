@@ -119,13 +119,14 @@ export default function AppletsView() {
     setErr(null);
     setNotice(null);
     try {
-      const r = await uninstallApplet(reader, gpKeyId || null, a.aid);
-      if (r.exitCode !== 0) {
-        setErr(`gp --delete exited ${r.exitCode}: ${r.stderr || r.stdout}`);
-      } else {
-        setNotice(`Uninstalled ${name}.`);
-        await refreshCard();
-      }
+      // Cascade (--force) only for a whole package; a bare instance must be
+      // deleted without it or the card returns 0x6985.
+      await uninstallApplet(reader, gpKeyId || null, a.aid, a.kind === "PKG");
+      setNotice(`Uninstalled ${name}.`);
+      // Re-read so the deleted row disappears. (refreshCard clears the error
+      // banner, so only call it on success — the backend now errors on a
+      // refused delete.)
+      await refreshCard();
     } catch (e: unknown) {
       setErr(String(e));
     } finally {

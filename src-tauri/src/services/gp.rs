@@ -207,14 +207,50 @@ pub async fn install_cap(
     run_gp(Some(reader), key_hex, &args).await
 }
 
-pub async fn uninstall_package(reader: &str, key_hex: Option<&str>, package_aid: &str) -> Result<CommandResult> {
-    // NB: `--uninstall` takes a *CAP file* and reads the AIDs out of it; it
-    // cannot take a bare AID (gp then tries to open the AID as a file and
-    // fails with "Could not read CAP: <aid>"). To remove something that is
-    // already on the card we delete by AID. `--force` lets the delete
-    // cascade a package together with every applet instance inside it,
-    // which is what the UI promises.
-    run_gp(Some(reader), key_hex, &["--delete", package_aid, "--force"]).await
+pub async fn uninstall_package(
+    reader: &str,
+    key_hex: Option<&str>,
+    target_aid: &str,
+    force: bool,
+) -> Result<CommandResult> {
+    // `--delete <AID>` removes an applet instance or a package by AID.
+    // `--force` additionally deletes the load file together with related
+    // objects (P2 = "delete related"). That is correct for cascading a
+    // *package* with its instances, but WRONG for a bare instance: the card
+    // answers 0x6985 ("Could not delete … Some app still active?") because
+    // the related load file is still referenced. So only force packages.
+    let mut args: Vec<&str> = vec!["--delete", target_aid];
+    if force {
+        args.push("--force");
+    }
+    let res = run_gp(Some(reader), key_hex, &args).await?;
+
+    // gp exits 0 even when the card refuses the DELETE — it just prints
+    // "Could not delete <AID> (0xNNNN)" to stderr. Detect that and surface a
+    // real error instead of a false success.
+    let combined = format!("{}\n{}", res.stdout, res.stderr).to_lowercase();
+    if combined.contains("could not delete")
+        || combined.contains("delete failed")
+        || combined.contains("0x6985")
+        || combined.contains("0x6a88")
+    {
+        let detail = res
+            .stderr
+            .lines()
+            .chain(res.stdout.lines())
+            .find(|l| {
+                let l = l.to_lowercase();
+                l.contains("could not") || l.contains("delete failed")
+            })
+            .map(|l| l.trim().to_string())
+            .unwrap_or_else(|| res.stderr.trim().to_string());
+        return Err(ServiceError::Command(
+            "gp --delete".into(),
+            if res.exit_code != 0 { res.exit_code } else { 1 },
+            detail,
+        ));
+    }
+    Ok(res)
 }
 
 pub async fn lock_to_key(reader: &str, current_key: Option<&str>, new_key_hex: &str) -> Result<CommandResult> {

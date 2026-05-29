@@ -90,12 +90,13 @@ pub async fn uninstall_applet(
     reader: String,
     gp_key_id: Option<String>,
     package_aid: String,
+    force: bool,
 ) -> Result<gp::CommandResult> {
     let key_hex = match gp_key_id {
         Some(id) => Some(vault::read_key_hex(&id)?),
         None => None,
     };
-    gp::uninstall_package(&reader, key_hex.as_deref(), &package_aid).await
+    gp::uninstall_package(&reader, key_hex.as_deref(), &package_aid, force).await
 }
 
 // ---------- Profiles ----------

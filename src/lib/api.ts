@@ -53,8 +53,11 @@ export const uninstallApplet = (
   reader: string,
   gpKeyId: string | null,
   packageAid: string,
+  /** Only true when deleting a package (cascades its instances). Passing it
+   *  for a bare instance makes the card answer 0x6985. */
+  force: boolean,
 ): Promise<CommandResult> =>
-  invoke("uninstall_applet", { reader, gpKeyId, packageAid });
+  invoke("uninstall_applet", { reader, gpKeyId, packageAid, force });
 
 // ---------- Profiles ----------
 
