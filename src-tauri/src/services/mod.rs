@@ -93,7 +93,7 @@ pub fn emit_command_log(
         finished_at: finished_at.to_rfc3339(),
         duration_ms,
         program: program.to_string(),
-        args: args.iter().map(|s| redact(s)).collect(),
+        args: redact_args(args),
         exit_code,
         stdout: truncate(redact(stdout).as_str(), 16 * 1024),
         stderr: truncate(stderr, 16 * 1024),
@@ -104,15 +104,83 @@ pub fn emit_command_log(
 }
 
 /// Best-effort redaction of obvious secret material (long hex strings that
-/// look like keys or PINs). Conservative so we don't munge real output.
+/// look like keys or PINs) in free-text command output. Conservative so we
+/// don't munge real output.
 fn redact(s: &str) -> String {
-    // 16+ contiguous hex chars in argv or stdout get masked. Catches GP
-    // keys (32 hex) and 16-byte PUKs.
+    // 16+ contiguous hex chars in stdout get masked. Catches GP keys
+    // (32 hex) and 16-byte PUKs that a tool might echo back.
     let re = regex::Regex::new(r"\b[0-9A-Fa-f]{16,}\b").unwrap();
     re.replace_all(s, |c: &regex::Captures| {
         let len = c[0].len();
         format!("<{}-char-hex>", len)
     }).into_owned()
+}
+
+/// True if a CLI flag carries secret material as its following value.
+/// Keys (`-k`, `--key*`), lock/unlock keys, and PIN/PUK/passphrase flags
+/// all hide their value; everything else (AIDs, CAP paths, reader names,
+/// `--delete`/`--install`/`--create`, …) stays readable.
+fn flag_carries_secret(flag: &str) -> bool {
+    let f = flag.trim_start_matches('-').to_ascii_lowercase();
+    f == "k"
+        || f.contains("key")
+        || f.contains("lock") // --lock <newkey>, --unlock <key>
+        || f.contains("pin")
+        || f.contains("puk")
+        || f.contains("pass")
+}
+
+/// Redact an argv while keeping public tokens (AIDs, CAP paths, sub-commands,
+/// reader names) legible. A token is masked only when the preceding flag
+/// carries a secret, or when it uses the inline `--flag=secret` form. This is
+/// deliberately context-aware: blanket hex masking also hid AIDs, which made
+/// the command log useless for diagnosing installs/deletes.
+fn redact_args(args: &[&str]) -> Vec<String> {
+    let mut out = Vec::with_capacity(args.len());
+    let mut prev_secret_flag = false;
+    for &a in args {
+        // Inline form: --key=DEADBEEF…
+        if a.starts_with('-') {
+            if let Some(eq) = a.find('=') {
+                let (flag, val) = a.split_at(eq);
+                if flag_carries_secret(flag) {
+                    out.push(format!("{}=<{}-char-hidden>", flag, val.len().saturating_sub(1)));
+                    prev_secret_flag = false;
+                    continue;
+                }
+            }
+        }
+        if prev_secret_flag {
+            out.push(format!("<{}-char-hidden>", a.len()));
+            prev_secret_flag = false;
+            continue;
+        }
+        prev_secret_flag = a.starts_with('-') && flag_carries_secret(a);
+        out.push(a.to_string());
+    }
+    out
+}
+
+#[cfg(test)]
+mod redact_tests {
+    use super::*;
+
+    #[test]
+    fn masks_key_value_keeps_aid() {
+        let args = ["-r", "SONY", "-k", "404142434445464748494A4B4C4D4E4F",
+                    "--delete", "F276A288BCFBA69D34F310", "--force"];
+        let r = redact_args(&args);
+        assert_eq!(r[1], "SONY");                 // reader name stays
+        assert_eq!(r[3], "<32-char-hidden>");     // key hidden
+        assert_eq!(r[5], "F276A288BCFBA69D34F310"); // AID stays readable
+        assert_eq!(r[6], "--force");
+    }
+
+    #[test]
+    fn masks_lock_key_and_inline_form() {
+        assert_eq!(redact_args(&["--lock", "0011223344556677"])[1], "<16-char-hidden>");
+        assert_eq!(redact_args(&["--key=DEADBEEFDEADBEEF"])[0], "--key=<16-char-hidden>");
+    }
 }
 
 fn truncate(s: &str, max: usize) -> String {

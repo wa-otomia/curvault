@@ -2,7 +2,7 @@
 //
 // Auto-fetches on reader selection so the applets are visible without
 // the user clicking through Readers > Inspect. Each non-protected row
-// gets a Delete action that runs `gp --uninstall <AID>` against the
+// gets a Delete action that runs `gp --delete <AID> --force` against the
 // selected reader and GP key — protected rows (ISD/SSD, the javacard
 // standard packages) keep the action greyed out so the user cannot
 // brick the card from the UI.
@@ -91,7 +91,7 @@ export default function AppletsView() {
     if (!(await confirmAction(
       `Uninstall ${a.kind} '${name}'?\n\n` +
       `AID: ${a.aid}\n` +
-      `This calls gp --uninstall and removes the package and every applet inside it.\n` +
+      `This calls gp --delete --force and removes the package and every applet inside it.\n` +
       `This action is irreversible.`,
       { title: "Uninstall applet", danger: true, okLabel: "Uninstall" },
     ))) return;
@@ -102,7 +102,7 @@ export default function AppletsView() {
     try {
       const r = await uninstallApplet(reader, gpKeyId || null, a.aid);
       if (r.exitCode !== 0) {
-        setErr(`gp --uninstall exited ${r.exitCode}: ${r.stderr || r.stdout}`);
+        setErr(`gp --delete exited ${r.exitCode}: ${r.stderr || r.stdout}`);
       } else {
         setNotice(`Uninstalled ${name}.`);
         await refreshCard();
@@ -237,7 +237,7 @@ export default function AppletsView() {
                             title={
                               protectedRow
                                 ? "System component — uninstalling would brick the card"
-                                : `gp --uninstall ${a.aid}`
+                                : `gp --delete ${a.aid} --force`
                             }
                           >
                             Delete

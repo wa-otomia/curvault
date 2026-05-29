@@ -208,7 +208,13 @@ pub async fn install_cap(
 }
 
 pub async fn uninstall_package(reader: &str, key_hex: Option<&str>, package_aid: &str) -> Result<CommandResult> {
-    run_gp(Some(reader), key_hex, &["--uninstall", package_aid]).await
+    // NB: `--uninstall` takes a *CAP file* and reads the AIDs out of it; it
+    // cannot take a bare AID (gp then tries to open the AID as a file and
+    // fails with "Could not read CAP: <aid>"). To remove something that is
+    // already on the card we delete by AID. `--force` lets the delete
+    // cascade a package together with every applet instance inside it,
+    // which is what the UI promises.
+    run_gp(Some(reader), key_hex, &["--delete", package_aid, "--force"]).await
 }
 
 pub async fn lock_to_key(reader: &str, current_key: Option<&str>, new_key_hex: &str) -> Result<CommandResult> {
