@@ -1,6 +1,6 @@
 {
   "name": "curvault",
-  "version": "0.1.15",
+  "version": "0.1.16",
   "private": true,
   "type": "module",
   "description": "Curvault — desktop card-issuance workstation for IsoApplet / JavaCard / FIDO2.",
@@ -19,6 +19,8 @@
     "@tauri-apps/plugin-dialog": "^2.0.0",
     "@tauri-apps/plugin-shell": "^2.0.0",
     "@tauri-apps/plugin-store": "^2.0.0",
+    "@tauri-apps/plugin-updater": "^2.0.0",
+    "@tauri-apps/plugin-process": "^2.0.0",
     "qrcode": "^1.5.4",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"

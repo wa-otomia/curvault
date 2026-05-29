@@ -9,6 +9,8 @@
     "core:app:allow-version",
     "dialog:default",
     "store:default",
+    "updater:default",
+    "process:default",
     {
       "identifier": "shell:allow-open",
       "allow": [
