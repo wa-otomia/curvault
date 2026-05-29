@@ -35,6 +35,9 @@ export interface GpKeyHandle {
   keyLengthBytes: number;
   createdAt: string;
   note?: string;
+  /** Where the secret bytes live: OS keychain, or a local 0600 file when
+   *  the keychain rejected the write (ad-hoc-signed builds). */
+  backend?: "keychain" | "file";
 }
 
 export interface Profile {

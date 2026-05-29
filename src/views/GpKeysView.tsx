@@ -123,6 +123,7 @@ export default function GpKeysView() {
                 <th>Handle</th>
                 <th>Card serial</th>
                 <th>Algorithm</th>
+                <th>Storage</th>
                 <th>Created</th>
                 <th>Note</th>
                 <th></th>
@@ -134,6 +135,22 @@ export default function GpKeysView() {
                   <td><code>{k.id}</code></td>
                   <td><code>{k.cardSerial ?? "—"}</code></td>
                   <td>{k.algorithm}</td>
+                  <td>
+                    <span
+                      title={k.backend === "file"
+                        ? "Stored in a local 0600 file (OS keychain was unavailable)"
+                        : "Stored in the OS keychain"}
+                      style={{
+                        fontSize: 11,
+                        padding: "0.1rem 0.4rem",
+                        borderRadius: 3,
+                        background: k.backend === "file" ? "rgba(212,161,60,0.18)" : "rgba(76,175,122,0.18)",
+                        color: k.backend === "file" ? "var(--warn)" : "var(--ok)",
+                      }}
+                    >
+                      {k.backend === "file" ? "file" : "keychain"}
+                    </span>
+                  </td>
                   <td>{new Date(k.createdAt).toLocaleString()}</td>
                   <td>{k.note ?? ""}</td>
                   <td>

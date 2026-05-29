@@ -1,15 +1,21 @@
-//! GP key vault.
+//! GP key vault with a keychain-first, file-fallback storage strategy.
 //!
-//! - Key bytes live in the OS keychain (keyring crate).
-//! - Per-handle metadata (alias, card serial, note, created_at) lives in
-//!   a small JSON file in the user data dir, so the UI can list them
-//!   without the keychain prompting for every entry.
+//! Preferred: the OS keychain (keyring crate, native backend per platform).
+//! Fallback: if a keychain write cannot be read straight back — which
+//! happens on ad-hoc-signed macOS builds whose code signature is not
+//! trusted for the data-protection keychain — the key is stored in a
+//! 0600-permission JSON file in the user data dir instead. Either way the
+//! UI only ever sees a handle id; the raw key reaches gp once per command.
+//!
+//! Each handle records which backend holds its key, so reads go to the
+//! right place.
 
 use super::{Result, ServiceError};
 use chrono::Utc;
 use keyring::Entry;
 use rand::RngCore;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
 use std::sync::Mutex;
@@ -25,11 +31,22 @@ pub struct GpKeyHandle {
     pub key_length_bytes: usize,
     pub created_at: String,
     pub note: Option<String>,
+    /// "keychain" or "file" — where the secret bytes actually live.
+    #[serde(default = "default_backend")]
+    pub backend: String,
+}
+
+fn default_backend() -> String {
+    "keychain".to_string()
 }
 
 #[derive(Default, Serialize, Deserialize)]
 struct VaultMeta {
     handles: Vec<GpKeyHandle>,
+    /// File-backed key material: handle id -> hex key. Only populated when
+    /// the OS keychain refused the write.
+    #[serde(default)]
+    file_keys: HashMap<String, String>,
 }
 
 static META: Mutex<Option<VaultMeta>> = Mutex::new(None);
@@ -56,10 +73,18 @@ fn data_dir() -> Option<PathBuf> {
     std::env::var_os("APPDATA").map(PathBuf::from)
 }
 
+#[cfg(unix)]
+fn lock_perms(path: &std::path::Path) {
+    use std::os::unix::fs::PermissionsExt;
+    let _ = fs::set_permissions(path, fs::Permissions::from_mode(0o600));
+}
+#[cfg(not(unix))]
+fn lock_perms(_path: &std::path::Path) {}
+
 fn load() -> Result<VaultMeta> {
     let mut guard = META.lock().map_err(|e| ServiceError::Store(e.to_string()))?;
     if let Some(m) = guard.as_ref() {
-        return Ok(VaultMeta { handles: m.handles.clone() });
+        return Ok(VaultMeta { handles: m.handles.clone(), file_keys: m.file_keys.clone() });
     }
     let path = meta_path()?;
     let parsed: VaultMeta = if path.exists() {
@@ -68,7 +93,7 @@ fn load() -> Result<VaultMeta> {
     } else {
         VaultMeta::default()
     };
-    *guard = Some(VaultMeta { handles: parsed.handles.clone() });
+    *guard = Some(VaultMeta { handles: parsed.handles.clone(), file_keys: parsed.file_keys.clone() });
     Ok(parsed)
 }
 
@@ -76,13 +101,27 @@ fn persist(m: &VaultMeta) -> Result<()> {
     let path = meta_path()?;
     let json = serde_json::to_string_pretty(m).map_err(|e| ServiceError::Store(e.to_string()))?;
     fs::write(&path, json)?;
+    lock_perms(&path); // owner-only — file_keys may hold secret bytes
     let mut guard = META.lock().map_err(|e| ServiceError::Store(e.to_string()))?;
-    *guard = Some(VaultMeta { handles: m.handles.clone() });
+    *guard = Some(VaultMeta { handles: m.handles.clone(), file_keys: m.file_keys.clone() });
     Ok(())
 }
 
 pub fn list() -> Result<Vec<GpKeyHandle>> {
     Ok(load()?.handles)
+}
+
+/// Try to round-trip a key through the OS keychain. Returns true only if a
+/// write followed by an immediate read gives the same value back.
+fn keychain_roundtrip(id: &str, hex_key: &str) -> bool {
+    let write = Entry::new(SERVICE, id).and_then(|e| e.set_password(hex_key));
+    if write.is_err() {
+        return false;
+    }
+    match Entry::new(SERVICE, id).and_then(|e| e.get_password()) {
+        Ok(back) => back == hex_key,
+        Err(_) => false,
+    }
 }
 
 pub fn generate(card_serial: Option<String>, note: Option<String>) -> Result<GpKeyHandle> {
@@ -97,30 +136,18 @@ pub fn generate(card_serial: Option<String>, note: Option<String>) -> Result<GpK
     rand::thread_rng().fill_bytes(&mut bytes);
     let hex_key = hex::encode_upper(bytes);
 
-    // Write to the OS keychain.
-    Entry::new(SERVICE, &id)?.set_password(&hex_key)?;
+    let backend = if keychain_roundtrip(&id, &hex_key) {
+        "keychain"
+    } else {
+        "file"
+    };
 
-    // Immediately read it back. On macOS, ad-hoc-signed apps occasionally
-    // see a SecItemAdd succeed (no error reported) but a subsequent
-    // SecItemCopyMatching come back empty — usually because Gatekeeper /
-    // codesigning attributes mismatch and the OS routes the lookup to a
-    // different keychain. Catch this here so the UI never shows a "key
-    // stored" message for a key it later cannot retrieve.
-    let written_back = Entry::new(SERVICE, &id)?
-        .get_password()
-        .map_err(|e| ServiceError::Other(format!(
-            "Generated a GP key but could not read it back from the OS \
-             keychain ({e}). This usually means the keychain is rejecting \
-             writes from this build (common with ad-hoc-signed macOS apps \
-             after a system upgrade). Open Keychain Access, delete any \
-             stale 'com.waotomia.curvault' entries, and try again — or \
-             rebuild the app from source so its code signature is fresh."
-        )))?;
-    if written_back != hex_key {
-        return Err(ServiceError::Other(
-            "Keychain returned a different value than was just written. \
-             The OS keychain is in an inconsistent state for this app.".into(),
-        ));
+    let mut m = load()?;
+    if backend == "file" {
+        m.file_keys.insert(id.clone(), hex_key.clone());
+    } else {
+        // In case a previous file-backed entry with this id existed.
+        m.file_keys.remove(&id);
     }
 
     let handle = GpKeyHandle {
@@ -130,9 +157,8 @@ pub fn generate(card_serial: Option<String>, note: Option<String>) -> Result<GpK
         key_length_bytes: 16,
         created_at: Utc::now().to_rfc3339(),
         note,
+        backend: backend.to_string(),
     };
-
-    let mut m = load()?;
     m.handles.retain(|h| h.id != id);
     m.handles.push(handle.clone());
     persist(&m)?;
@@ -141,19 +167,32 @@ pub fn generate(card_serial: Option<String>, note: Option<String>) -> Result<GpK
 }
 
 pub fn read_key_hex(id: &str) -> Result<String> {
+    let m = load()?;
+    let backend = m
+        .handles
+        .iter()
+        .find(|h| h.id == id)
+        .map(|h| h.backend.clone())
+        .unwrap_or_else(|| "keychain".to_string());
+
+    if backend == "file" {
+        return m.file_keys.get(id).cloned().ok_or_else(|| {
+            ServiceError::Other(format!(
+                "Key '{id}' is recorded as file-backed but its bytes are missing \
+                 from the vault file. Delete this handle and generate a new key."
+            ))
+        });
+    }
+
     Entry::new(SERVICE, id)?
         .get_password()
         .map_err(|e| {
-            // Specifically map NoEntry to something actionable. Other
-            // keyring errors fall through as-is.
             let msg = e.to_string();
             if msg.contains("No matching entry") || msg.contains("NoEntry") {
                 ServiceError::Other(format!(
-                    "Key '{id}' is in the metadata file but missing from the OS \
-                     keychain. The most likely cause is an app upgrade — \
-                     ad-hoc-signed macOS apps lose access to keychain items \
-                     written by the previous build. Click Delete on this row \
-                     to clean up the stale handle, then Generate a fresh GP key."
+                    "Key '{id}' is missing from the OS keychain. Delete this row \
+                     and generate a fresh GP key (newer builds fall back to a \
+                     local 0600 file when the keychain is unavailable)."
                 ))
             } else {
                 ServiceError::Keychain(e)
@@ -162,10 +201,11 @@ pub fn read_key_hex(id: &str) -> Result<String> {
 }
 
 pub fn delete(id: &str) -> Result<()> {
-    let entry = Entry::new(SERVICE, id)?;
-    let _ = entry.delete_credential();   // best-effort: tolerate missing
+    // Best-effort keychain removal — tolerate missing.
+    let _ = Entry::new(SERVICE, id).and_then(|e| e.delete_credential());
     let mut m = load()?;
     m.handles.retain(|h| h.id != id);
+    m.file_keys.remove(id);
     persist(&m)?;
     Ok(())
 }

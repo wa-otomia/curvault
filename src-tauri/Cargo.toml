@@ -1,6 +1,6 @@
 [package]
 name = "curvault"
-version = "0.1.19"
+version = "0.1.20"
 description = "Curvault — desktop card-issuance workstation for IsoApplet / JavaCard / FIDO2."
 authors = ["wa-otomia"]
 edition = "2021"
@@ -34,6 +34,19 @@ hex = "0.4"
 regex = "1"
 tokio = { version = "1", features = ["process", "io-util", "macros", "sync"] }
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+
+# keyring 3.x gates the real OS credential stores behind features. Without
+# them it falls back to a non-persistent store, which is exactly why
+# set_password "succeeds" but the next get_password returns NoEntry. Enable
+# the native backend per platform.
+[target.'cfg(target_os = "macos")'.dependencies]
+keyring = { version = "3", features = ["apple-native"] }
+
+[target.'cfg(target_os = "windows")'.dependencies]
+keyring = { version = "3", features = ["windows-native"] }
+
+[target.'cfg(target_os = "linux")'.dependencies]
+keyring = { version = "3", features = ["sync-secret-service", "crypto-rust"] }
 
 [profile.release]
 codegen-units = 1
