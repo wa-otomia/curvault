@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { listen } from "@tauri-apps/api/event";
 import Sidebar, { type View } from "./components/Sidebar";
 import StatusBar from "./components/StatusBar";
 import LogPanel from "./components/LogPanel";
@@ -18,6 +19,13 @@ import AboutView from "./views/AboutView";
 
 export default function App() {
   const [view, setView] = useState<View>("dashboard");
+
+  // The native "About Curvault" menu item routes here instead of the bare
+  // macOS panel.
+  useEffect(() => {
+    const unlisten = listen("menu://about", () => setView("about"));
+    return () => { unlisten.then((f) => f()); };
+  }, []);
 
   return (
     <>

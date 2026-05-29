@@ -120,6 +120,73 @@ fn fixup_path() {
     // exotic, they can add it to the system PATH or restart explorer.exe.
 }
 
+/// Open (or focus) the standalone software-update window. Both the
+/// "Check for Updates…" menu item and the in-app About button route here so
+/// the whole download/restart flow lives in one dedicated window.
+pub(crate) fn open_updater<R: tauri::Runtime>(app: &tauri::AppHandle<R>) {
+    use tauri::{Manager, WebviewUrl, WebviewWindowBuilder};
+    if let Some(w) = app.get_webview_window("updater") {
+        let _ = w.show();
+        let _ = w.set_focus();
+        return;
+    }
+    // The webview branches on its window label (see main.tsx) to render the
+    // updater UI from the same bundle.
+    let _ = WebviewWindowBuilder::new(app, "updater", WebviewUrl::App("index.html".into()))
+        .title("Software Update")
+        .inner_size(480.0, 600.0)
+        .min_inner_size(420.0, 520.0)
+        .resizable(false)
+        .build();
+}
+
+/// Build the application menu: a custom About + Check-for-Updates pair plus
+/// the usual edit/window items. Cross-platform items are unconditional;
+/// macOS-only predefined items are gated.
+fn build_menu<R: tauri::Runtime>(
+    handle: &tauri::AppHandle<R>,
+) -> tauri::Result<tauri::menu::Menu<R>> {
+    use tauri::menu::{MenuBuilder, MenuItemBuilder, SubmenuBuilder};
+
+    let about = MenuItemBuilder::with_id("about", "About Curvault").build(handle)?;
+    let check = MenuItemBuilder::with_id("check-update", "Check for Updates…").build(handle)?;
+
+    #[allow(unused_mut)]
+    let mut app_sub = SubmenuBuilder::new(handle, "Curvault")
+        .item(&about)
+        .item(&check)
+        .separator();
+    #[cfg(target_os = "macos")]
+    {
+        app_sub = app_sub
+            .services()
+            .separator()
+            .hide()
+            .hide_others()
+            .show_all()
+            .separator();
+    }
+    let app_sub = app_sub.quit().build()?;
+
+    #[allow(unused_mut)]
+    let mut edit = SubmenuBuilder::new(handle, "Edit");
+    #[cfg(target_os = "macos")]
+    {
+        edit = edit.undo().redo().separator();
+    }
+    let edit = edit.cut().copy().paste().select_all().build()?;
+
+    let window = SubmenuBuilder::new(handle, "Window")
+        .minimize()
+        .separator()
+        .close_window()
+        .build()?;
+
+    MenuBuilder::new(handle)
+        .items(&[&app_sub, &edit, &window])
+        .build()
+}
+
 pub fn run() {
     fixup_path();
 
@@ -129,6 +196,19 @@ pub fn run() {
         .plugin(tauri_plugin_store::Builder::default().build())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
+        .menu(|handle| build_menu(handle))
+        .on_menu_event(|app, event| {
+            use tauri::Emitter;
+            match event.id().as_ref() {
+                // Route to the rich in-app About view rather than the bare
+                // native panel.
+                "about" => {
+                    let _ = app.emit("menu://about", ());
+                }
+                "check-update" => open_updater(app),
+                _ => {}
+            }
+        })
         .setup(|app| {
             services::install_app_handle(app.handle().clone());
             Ok(())
@@ -157,6 +237,7 @@ pub fn run() {
             commands::fido2_reset,
             commands::run_issuance,
             commands::check_for_updates,
+            commands::open_updater_window,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

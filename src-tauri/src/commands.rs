@@ -181,3 +181,9 @@ pub async fn run_issuance(
 pub async fn check_for_updates() -> Result<updates::UpdateInfo> {
     updates::check().await
 }
+
+/// Open (or focus) the standalone software-update window.
+#[tauri::command]
+pub fn open_updater_window(app: tauri::AppHandle) {
+    crate::open_updater(&app);
+}

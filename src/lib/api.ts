@@ -118,6 +118,10 @@ export interface UpdateInfo {
 export const checkForUpdates = (): Promise<UpdateInfo> =>
   invoke("check_for_updates");
 
+/** Open (or focus) the standalone software-update window. */
+export const openUpdaterWindow = (): Promise<void> =>
+  invoke("open_updater_window");
+
 // ---------- Events ----------
 
 export interface CommandLogEntry {

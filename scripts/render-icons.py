@@ -115,7 +115,7 @@ def render(size):
     grad_cy = size * 0.08
     grad_max = size * 1.05
 
-    logo_frac = 0.72   # logo fills ~72 % of the canvas
+    logo_frac = 0.86   # logo fills ~86 % of the canvas (large, prominent C)
     logo_size = size * logo_frac
     logo_x0 = (size - logo_size) / 2
     logo_y0 = (size - logo_size) / 2
