@@ -242,6 +242,72 @@ pub async fn read_atr(reader: &str) -> Result<Option<String>> {
     Ok(text.lines().next().map(|l| l.trim().to_string()))
 }
 
+/// Result of actively probing a reader for a usable card.
+///
+/// The `opensc-tool -l` "Card" column only reflects PCSC's
+/// SCARD_STATE_PRESENT, which some contactless readers (notably the SONY
+/// FeliCa Port / PaSoRi) latch on even with nothing on the antenna, or for a
+/// mute card that can't be powered. Powering the card (reading its ATR) is
+/// the authoritative "is there something I can actually talk to" signal.
+pub enum CardProbe {
+    /// Card powered up; ATR captured (if any line was printed).
+    Present(Option<String>),
+    /// Reader explicitly reports no card present.
+    Absent,
+    /// Couldn't tell — opensc not found, a sharing violation because another
+    /// operation holds the card, or any other transient error. Callers must
+    /// NOT treat this as a removal.
+    Unknown,
+}
+
+/// Probe a reader for a usable card by attempting to power it and read the
+/// ATR. `log` controls whether a command-log entry is emitted (off for the
+/// periodic status poll so it doesn't flood the panel).
+pub async fn probe_card(reader: &str, log: bool) -> CardProbe {
+    let started_at = chrono::Utc::now();
+    let args = ["-r", reader, "-an"];
+    let res = exec_tool("opensc-tool", &args).await;
+
+    if log {
+        match &res {
+            Ok(out) => emit_command_log(
+                "opensc-tool", &args, started_at,
+                out.status.code().unwrap_or(-1),
+                &String::from_utf8_lossy(&out.stdout),
+                &String::from_utf8_lossy(&out.stderr),
+                None,
+            ),
+            Err(e) => emit_command_log(
+                "opensc-tool", &args, started_at, -1, "", "", Some(&e.to_string()),
+            ),
+        }
+    }
+
+    let out = match res {
+        Ok(o) => o,
+        Err(_) => return CardProbe::Unknown,
+    };
+    if out.status.success() {
+        let text = String::from_utf8_lossy(&out.stdout);
+        return CardProbe::Present(text.lines().next().map(|l| l.trim().to_string()));
+    }
+    // Non-zero exit. The one case we must NOT read as a removal is another
+    // operation holding the card (a sharing/exclusive violation). Everything
+    // else — "card not present", a reset/ATR failure on an empty contactless
+    // antenna, etc. — means there is no card we can use, so treat as absent.
+    let stderr = String::from_utf8_lossy(&out.stderr).to_lowercase();
+    if stderr.contains("sharing")
+        || stderr.contains("exclusive")
+        || stderr.contains("in use")
+        || stderr.contains("busy")
+        || stderr.contains("transaction")
+    {
+        CardProbe::Unknown
+    } else {
+        CardProbe::Absent
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

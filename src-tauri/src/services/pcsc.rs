@@ -20,17 +20,38 @@ pub struct CardInfo {
 pub async fn list_readers() -> Result<Vec<opensc::Reader>> {
     let mut readers = opensc::list_readers().await?;
     for r in readers.iter_mut() {
+        // opensc-tool's "Card" column over-reports on contactless readers
+        // (latched / mute cards). Confirm by actually powering the card.
         if r.has_card {
-            r.atr = opensc::read_atr(&r.name).await.ok().flatten();
+            match opensc::probe_card(&r.name, true).await {
+                opensc::CardProbe::Present(atr) => {
+                    r.has_card = true;
+                    r.atr = atr;
+                }
+                opensc::CardProbe::Absent => r.has_card = false,
+                // Busy / transient error: keep the optimistic flag, no ATR.
+                opensc::CardProbe::Unknown => {}
+            }
         }
     }
     Ok(readers)
 }
 
-/// Reader + card-presence counts only — no ATR reads, no command-log
-/// entries. Backs the status bar's lightweight poll.
+/// Reader list for the status bar's lightweight poll. Confirms presence the
+/// same way (so a latched / mute contactless reader doesn't read as
+/// "card present") but emits no command-log entries.
 pub async fn list_readers_quiet() -> Result<Vec<opensc::Reader>> {
-    opensc::list_readers_quiet().await
+    let mut readers = opensc::list_readers_quiet().await?;
+    for r in readers.iter_mut() {
+        if r.has_card {
+            match opensc::probe_card(&r.name, false).await {
+                opensc::CardProbe::Present(_) => r.has_card = true,
+                opensc::CardProbe::Absent => r.has_card = false,
+                opensc::CardProbe::Unknown => {}
+            }
+        }
+    }
+    Ok(readers)
 }
 
 pub async fn inspect(reader: &str) -> Result<CardInfo> {
