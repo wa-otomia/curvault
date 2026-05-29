@@ -14,6 +14,7 @@ const noDrag = { onMouseDown: (e: React.MouseEvent) => e.stopPropagation() };
 
 export default function AboutWindow() {
   const [version, setVersion] = useState("");
+  const [closing, setClosing] = useState(false);
 
   useEffect(() => {
     document.documentElement.style.background = "transparent";
@@ -21,12 +22,15 @@ export default function AboutWindow() {
     getVersion().then(setVersion).catch(() => setVersion(""));
   }, []);
 
-  const onClose = () => { getCurrentWindow().close().catch(() => {}); };
+  const onClose = () => {
+    setClosing(true);
+    setTimeout(() => getCurrentWindow().close().catch(() => {}), 300);
+  };
   const onOpenRepo = () => { openExternal(REPO_URL).catch(() => {}); };
   const onCheckUpdate = () => { openUpdaterWindow().catch(() => {}); };
 
   return (
-    <div className="updater-root" {...DRAG}>
+    <div className={`updater-root${closing ? " closing" : ""}`} {...DRAG}>
       <BrandBackdrop opacity={0.5} />
 
       <div className="updater-content" {...DRAG}>

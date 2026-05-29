@@ -29,6 +29,7 @@ function fmtBytes(n: number): string {
 export default function UpdaterWindow() {
   const [state, setState] = useState<State>({ kind: "checking" });
   const [version, setVersion] = useState("");
+  const [closing, setClosing] = useState(false);
 
   // Frameless + transparent window: make the page background transparent so
   // the rounded panel's corners show through.
@@ -86,10 +87,14 @@ export default function UpdaterWindow() {
     try { await relaunch(); }
     catch (e: unknown) { setState({ kind: "error", message: String(e) }); }
   };
-  const onClose = () => { getCurrentWindow().close().catch(() => {}); };
+  // Play the dismiss animation, then actually close the window.
+  const onClose = () => {
+    setClosing(true);
+    setTimeout(() => getCurrentWindow().close().catch(() => {}), 300);
+  };
 
   return (
-    <div className="updater-root" {...DRAG}>
+    <div className={`updater-root${closing ? " closing" : ""}`} {...DRAG}>
       <BrandBackdrop opacity={0.5} />
 
       <div className="updater-content" {...DRAG}>

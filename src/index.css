@@ -51,6 +51,15 @@ body {
   font-feature-settings: "ss01", "cv11";
 }
 
+/* Lock the document so macOS WKWebView can't rubber-band the whole window
+ * when you pull past the top/bottom (which exposed the chrome behind it).
+ * The only scroll lives inside .content. */
+html, body {
+  height: 100%;
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+
 @supports not (backdrop-filter: blur(1px)) {
   /* No backdrop-filter -> no vibrancy. Drop to solid for legibility. */
   body { background: var(--bg); }
@@ -289,6 +298,7 @@ pre {
   flex: 1;
   padding: 1.5rem 2rem;
   overflow: auto;
+  overscroll-behavior: contain; /* don't chain bounce to the document */
   position: relative; /* anchor for .loading-overlay */
 }
 
@@ -619,6 +629,17 @@ th {
   -webkit-user-select: none;
   user-select: none;
   cursor: default;
+}
+
+/* Dismiss animation: shrink + fade + blur out over 0.3s, then the window is
+ * actually closed (the JS waits for this to finish). */
+.updater-root.closing {
+  animation: popupClose 0.3s ease forwards;
+  pointer-events: none;
+}
+@keyframes popupClose {
+  from { opacity: 1; transform: scale(1);    filter: blur(0); }
+  to   { opacity: 0; transform: scale(0.88); filter: blur(8px); }
 }
 
 .updater-content {
